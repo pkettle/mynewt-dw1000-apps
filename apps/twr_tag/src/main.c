@@ -37,6 +37,7 @@
 #include "dw1000/dw1000_mac.h"
 #include "dw1000/dw1000_rng.h"
 #include "dw1000/dw1000_ftypes.h"
+#include "dw1000/dw1000_time.h"
 
 #if MYNEWT_VAL(DW1000_LWIP)
 #include <dw1000/dw1000_lwip.h>
@@ -230,6 +231,7 @@ int main(int argc, char **argv){
     printf("lotID =%lX\n",inst->lotID);
     printf("xtal_trim =%X\n",inst->xtal_trim);
     
+    dw1000_timer_init(inst,0);
     init_timer(inst);
 
     dw1000_set_rx_timeout(inst, 0);
@@ -243,4 +245,3 @@ int main(int argc, char **argv){
 
     return rc;
 }
-
