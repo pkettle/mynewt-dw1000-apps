@@ -231,7 +231,7 @@ int main(int argc, char **argv){
     printf("lotID =%lX\n",inst->lotID);
     printf("xtal_trim =%X\n",inst->xtal_trim);
     
-    dw1000_timer_init(inst,0);
+    dw1000_timer_init(inst,1);
     init_timer(inst);
 
     dw1000_set_rx_timeout(inst, 0);
