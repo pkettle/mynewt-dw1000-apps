@@ -230,8 +230,10 @@ int main(int argc, char **argv){
     printf("partID =%lX\n",inst->partID);
     printf("lotID =%lX\n",inst->lotID);
     printf("xtal_trim =%X\n",inst->xtal_trim);
-    
+#if MYNEWT_VAL(DW1000_TIME)    
     dw1000_timer_init(inst,1);
+#endif
+
     init_timer(inst);
 
     dw1000_set_rx_timeout(inst, 0);

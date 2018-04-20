@@ -19,12 +19,3 @@ syscfg.defs:
         description: >
             UUID
         value: ((uint64_t){0x8000}) 
-    DELTA:
-        description: >
-            Total slot time
-        value: 100
-    NSLOTS:
-        description: >
-            Number of slots
-        value: 10
-           
