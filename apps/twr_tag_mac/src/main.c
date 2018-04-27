@@ -135,13 +135,11 @@ static void timer_ev_cb(struct os_event *ev) {
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"start_tx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.rx_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-    if (inst->status.request_timeout)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"request_timeout\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.rx_timeout_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
    
     if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error 
-            || inst->status.request_timeout ||  inst->status.rx_timeout_error){
+        ||  inst->status.rx_timeout_error){
 
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
@@ -208,13 +206,12 @@ int main(int argc, char **argv){
  
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
-
-    dw1000_set_panid(inst,inst->PANID);
-    dw1000_mac_init(inst, &mac_config);
 #if MYNEWT_VAL(DW1000_MAC_FILTERING)
     dw1000_set_address16(inst, inst->my_short_address);
-    dw1000_mac_framefilter(inst, DWT_FF_DATA_EN );
-#endif
+    inst-> config.framefilter_enabled = 1;
+#endif   
+    dw1000_set_panid(inst,inst->PANID);
+    dw1000_mac_init(inst, &mac_config);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
 #if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)

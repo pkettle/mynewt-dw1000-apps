@@ -18,5 +18,6 @@ syscfg.defs:
     UUID_CCP_MASTER:
         description: >
             Clock Master UUID
-        value: ((uint16_t){0x8000})         
+        value: ((uint16_t){0x8000})
+                                             
     
