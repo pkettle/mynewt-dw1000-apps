@@ -79,7 +79,7 @@ static dw1000_rng_config_t rng_config = {
 #if MYNEWT_VAL(DW1000_PAN)
 static dw1000_pan_config_t pan_config = {
     .tx_holdoff_delay = 0x0C00,         // Send Time delay in usec.
-    .rx_timeout_period = 0x4000         // Receive response timeout in usec.
+    .rx_timeout_period = 0x8000         // Receive response timeout in usec.
 };
 #endif
 
@@ -117,6 +117,8 @@ static struct os_callout blinky_callout;
  * Event callback function for timer events. It toggles the led pin.
 */
 
+#define SAMPLE_FREQ 50.0
+
 static void timer_ev_cb(struct os_event *ev) {
     float rssi;
     assert(ev != NULL);
@@ -126,6 +128,8 @@ static void timer_ev_cb(struct os_event *ev) {
     
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     dw1000_rng_instance_t * rng = inst->rng; 
+    
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/SAMPLE_FREQ);
 
     dw1000_rng_request(inst, 0x4321, DWT_DS_TWR);
 
@@ -138,8 +142,6 @@ static void timer_ev_cb(struct os_event *ev) {
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"start_tx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.rx_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-    if (inst->status.request_timeout)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"request_timeout\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.rx_timeout_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
    
@@ -176,8 +178,6 @@ static void timer_ev_cb(struct os_event *ev) {
                 );
             frame->code = DWT_DS_TWR_END;
     }
-    
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/9);
 }
 
 /*
@@ -202,6 +202,7 @@ int main(int argc, char **argv){
 
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
+    inst->my_long_address = ((uint64_t) inst->device_id << 32) + inst->partID;
 
     dw1000_set_panid(inst,inst->PANID);
     dw1000_mac_init(inst, &mac_config);
@@ -212,7 +213,7 @@ int main(int argc, char **argv){
 #endif
 #if MYNEWT_VAL(DW1000_PAN)
     dw1000_pan_init(inst, &pan_config);   
-    dw1000_pan_start(inst);  
+    dw1000_pan_start(inst, DWT_NONBLOCKING);  
 #endif
     printf("device_id = 0x%lX\n",inst->device_id);
     printf("PANID = 0x%X\n",inst->PANID);
