@@ -208,7 +208,6 @@ int main(int argc, char **argv){
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
 #if MYNEWT_VAL(DW1000_MAC_FILTERING)
     dw1000_set_address16(inst, inst->my_short_address);
-    inst-> config.framefilter_enabled = 1;
 #endif   
     dw1000_set_panid(inst,inst->PANID);
     dw1000_mac_init(inst, &mac_config);
