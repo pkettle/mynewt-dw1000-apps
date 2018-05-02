@@ -37,8 +37,9 @@
 #include "dw1000/dw1000_mac.h"
 #include "dw1000/dw1000_rng.h"
 #include "dw1000/dw1000_ftypes.h"
+#if MYNEWT_VAL(DW1000_TIME)
 #include "dw1000/dw1000_time.h"
-
+#endif
 #if MYNEWT_VAL(DW1000_LWIP)
 #include <dw1000/dw1000_lwip.h>
 #endif
@@ -183,17 +184,10 @@ static void timer_ev_cb(struct os_event *ev) {
         dw1000_start_rx(inst); 
     }
 #if MYNEWT_VAL(DW1000_TIME)
-    if(inst->time->status.ccp_packet_received == true){
-        usec_exp = os_cputime_ticks_to_usecs(os_cputime_get32());
-        inst->time->status.ccp_packet_received = false;
-        printf("Current CCP interval = %llu \n",inst->time->ccp_interval);
-    }else if(inst->time->ccp_interval < ((os_cputime_ticks_to_usecs(os_cputime_get32()))-usec_exp)){
-        usec_exp = os_cputime_ticks_to_usecs(os_cputime_get32());
-        printf("Expected CCP at %lu \n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-        inst->ccp->frames[(inst->ccp->idx)%inst->ccp->nframes]->reception_timestamp = 0;
+    if(check_time(inst) == true){
+        printf("Current Transmission timestamp = %llu \n",inst->time->transmission_timestamp);
     }
 #endif
-
 }
 
 static void init_timer(dw1000_dev_instance_t * inst) {
