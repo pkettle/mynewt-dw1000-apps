@@ -124,6 +124,7 @@ static void timer_ev_cb(struct os_event *ev) {
     
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     dw1000_rng_instance_t * rng = inst->rng; 
+    uint32_t delay_us = 100000;
 
     assert(inst->rng->nframes > 0);
 
@@ -185,7 +186,13 @@ static void timer_ev_cb(struct os_event *ev) {
     }
 #if MYNEWT_VAL(DW1000_TIME)
     if(check_time(inst) == true){
-        printf("Current Transmission timestamp = %llu \n",inst->time->transmission_timestamp);
+        uint64_t t_rel = time_relative(inst,delay_us);
+        uint64_t t_abs = time_absolute(inst,t_rel,delay_us);
+        uint64_t t_now = time_now(inst);
+        printf("CCP Packet received at %llu \n",dw1000_read_systime(inst));
+        printf("Time relative = %llu \n", t_rel);
+        printf("Time absolute = %llu \n", t_abs);
+        printf("Time now      = %llu \n", t_now);
     }
 #endif
 }
