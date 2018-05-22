@@ -53,12 +53,12 @@ static dwt_config_t mac_config = {
     .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 9,                        // TX preamble code. Used in TX only. 
-    .rxCode = 9,                        // RX preamble code. Used in RX only. 
+    .txCode = 11,                        // TX preamble code. Used in TX only. 
+    .rxCode = 11,                        // RX preamble code. Used in RX only. 
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
-    .sfdTO = (256 + 1 + 8 - 8)         // SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. 
+    .sfdTO = (256 + 1 + 8 - 8)          // SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. 
 };
 
 static dw1000_phy_txrf_config_t txrf_config = { 
@@ -78,7 +78,7 @@ static dw1000_rng_config_t rng_config = {
 #if MYNEWT_VAL(DW1000_PAN)
 static dw1000_pan_config_t pan_config = {
     .tx_holdoff_delay = 0x0C00,         // Send Time delay in usec.
-    .rx_timeout_period = 0x4000         // Receive response timeout in usec.
+    .rx_timeout_period = 0x8000         // Receive response timeout in usec.
 };
 #endif
 
@@ -110,16 +110,15 @@ void print_frame(const char * name, twr_frame_t *twr ){
 
 /* The timer callout */
 static struct os_callout blinky_callout;
-/*
- * Event callback function for timer events. 
-*/
+
+#define SAMPLE_FREQ 50.0
 static void timer_ev_cb(struct os_event *ev) {
     float rssi;
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
 
     hal_gpio_toggle(LED_BLINK_PIN);
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/20);
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/SAMPLE_FREQ);
     
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     dw1000_rng_instance_t * rng = inst->rng; 
@@ -140,7 +139,6 @@ static void timer_ev_cb(struct os_event *ev) {
    
     if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error 
         ||  inst->status.rx_timeout_error){
-
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
@@ -180,16 +178,14 @@ static void timer_ev_cb(struct os_event *ev) {
             (frame->transmission_timestamp - frame->reception_timestamp),
             (int)(rssi)
         );
-
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
-
 }
 
 static void init_timer(dw1000_dev_instance_t * inst) {
     os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, inst);
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC);
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/100);
 }
 
 int main(int argc, char **argv){
@@ -206,10 +202,10 @@ int main(int argc, char **argv){
  
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
-#if MYNEWT_VAL(DW1000_MAC_FILTERING)
-    dw1000_set_address16(inst, inst->my_short_address);
-#endif   
+    inst->my_long_address = ((uint64_t) inst->device_id << 32) + inst->partID;
+
     dw1000_set_panid(inst,inst->PANID);
+    inst->config.framefilter_enabled = 0;
     dw1000_mac_init(inst, &mac_config);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
@@ -217,10 +213,19 @@ int main(int argc, char **argv){
     dw1000_ccp_init(inst, 2, MYNEWT_VAL(UUID_CCP_MASTER));
 #endif
 #if MYNEWT_VAL(DW1000_PAN)
-    dw1000_pan_init(inst, &pan_config);   
-    dw1000_pan_start(inst);  
+    dw1000_pan_init(inst, &pan_config); 
+    dw1000_pan_start(inst, DWT_NONBLOCKING); // Don't block on the eventq_dflt
+    while(inst->pan->status.valid != true){ 
+        os_eventq_run(os_eventq_dflt_get());
+        os_cputime_delay_usecs(5000);
+    } 
+     dw1000_softreset(inst);
+     dw1000_phy_init(inst, &txrf_config);
+     dw1000_set_panid(inst,inst->PANID);
+     inst->config.framefilter_enabled = 1;
+     dw1000_set_address16(inst, inst->my_short_address);
+     dw1000_mac_init(inst, &mac_config);
 #endif
-
     printf("device_id=%lX\n",inst->device_id);
     printf("PANID=%X\n",inst->PANID);
     printf("DeviceID =%X\n",inst->my_short_address);
@@ -228,10 +233,10 @@ int main(int argc, char **argv){
     printf("lotID =%lX\n",inst->lotID);
     printf("xtal_trim =%X\n",inst->xtal_trim);
     
-    dw1000_set_rx_timeout(inst, 0);
-    dw1000_start_rx(inst); 
-
     init_timer(inst);
+
+    dw1000_set_rx_timeout(inst, 0);
+    dw1000_start_rx(inst);
 
     while (1) {
         os_eventq_run(os_eventq_dflt_get());   
