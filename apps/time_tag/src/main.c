@@ -40,14 +40,8 @@
 #if MYNEWT_VAL(DW1000_TIME)
 #include "dw1000/dw1000_time.h"
 #endif
-#if MYNEWT_VAL(DW1000_LWIP)
-#include <dw1000/dw1000_lwip.h>
-#endif
 #if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)
 #include <dw1000/dw1000_ccp.h>
-#endif
-#if MYNEWT_VAL(DW1000_PAN)
-#include <dw1000/dw1000_pan.h>
 #endif
 
 static dwt_config_t mac_config = {
@@ -198,11 +192,12 @@ time_postprocess(struct os_event * ev){
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     uint32_t delay = inst->slot_id * MYNEWT_VAL(TDMA_DELTA)/MYNEWT_VAL(TDMA_NSLOTS);
     //Calculate the transmission timestamp using the CCP reception timestamp
-    printf("{\"systime\": %llu, \"txtimestamp\": %llu}\n",dw1000_read_systime(inst),time_relative(inst,delay));
+    printf("{\"systime\": %llu, \"txtimestamp\": %llu, \"ccp_interval\": %llu}\n",dw1000_read_systime(inst),time_relative(inst,delay),inst->time->ccp_interval);
     inst->txtimestamp = time_relative(inst,delay);
     //TODO: Debug the issue with wrong reception timestamp being notified at times
+    //In those cases the delay value will become more than the CCP period or will go to a value behind the current systime
     //For now just drop such events
-    if(dw1000_read_systime(inst) < inst->txtimestamp)
+    if((abs((inst->txtimestamp - dw1000_read_systime(inst))*15.65*1e-6) < MYNEWT_VAL(CCP_PERIOD)) && dw1000_read_systime(inst) < inst->txtimestamp)
         dw1000_rng_request_delay_start(inst,0xabab,inst->txtimestamp, DWT_DS_TWR);
     else{
         dw1000_set_rx_timeout(inst, 0);
