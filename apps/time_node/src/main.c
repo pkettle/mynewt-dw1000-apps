@@ -43,8 +43,8 @@ static dwt_config_t mac_config = {
     .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 8,                        // TX preamble code. Used in TX only. 
-    .rxCode = 8,                        // RX preamble code. Used in RX only. 
+    .txCode = 9,                        // TX preamble code. Used in TX only.
+    .rxCode = 9,                        // RX preamble code. Used in RX only.
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
@@ -174,8 +174,10 @@ static void timer_ev_cb(struct os_event *ev) {
                 (int)(rssi)
               );
 #endif
-        printf("{ \"utime\": %lu, \"tof\": %lu, \"range\": %lu }\n ",
+        printf("{ \"utime\": %lu, \"src\": 0x%x, \"dst\":0x%x,\"tof\": %lu, \"range\": %lu }\n ",
                 os_cputime_ticks_to_usecs(os_cputime_get32()),
+                frame->src_address,
+                frame->dst_address,
                 time_of_flight,
                 (uint32_t)(range * 1000));
         dw1000_set_rx_timeout(inst,0);

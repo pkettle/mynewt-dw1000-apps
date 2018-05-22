@@ -55,8 +55,8 @@ static dwt_config_t mac_config = {
     .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 8,                        // TX preamble code. Used in TX only. 
-    .rxCode = 8,                        // RX preamble code. Used in RX only. 
+    .txCode = 9,                        // TX preamble code. Used in TX only.
+    .rxCode = 9,                        // RX preamble code. Used in RX only.
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
@@ -198,8 +198,16 @@ time_postprocess(struct os_event * ev){
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     uint32_t delay = inst->slot_id * MYNEWT_VAL(TDMA_DELTA)/MYNEWT_VAL(TDMA_NSLOTS);
     //Calculate the transmission timestamp using the CCP reception timestamp
+    printf("{\"systime\": %llu, \"txtimestamp\": %llu}\n",dw1000_read_systime(inst),time_relative(inst,delay));
     inst->txtimestamp = time_relative(inst,delay);
-    dw1000_rng_request_delay_start(inst,0xabab,inst->txtimestamp, DWT_DS_TWR);
+    //TODO: Debug the issue with wrong reception timestamp being notified at times
+    //For now just drop such events
+    if(dw1000_read_systime(inst) < inst->txtimestamp)
+        dw1000_rng_request_delay_start(inst,0xabab,inst->txtimestamp, DWT_DS_TWR);
+    else{
+        dw1000_set_rx_timeout(inst, 0);
+        dw1000_start_rx(inst);
+    }
 }
 #endif
 
