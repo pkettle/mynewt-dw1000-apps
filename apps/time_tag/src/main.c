@@ -106,6 +106,7 @@ void print_frame(const char * name, twr_frame_t *twr ){
 
 /* The timer callout */
 static struct os_callout blinky_callout;
+static struct os_callout tdma_callout;
 
 #define SAMPLE_FREQ 128.0
 static void timer_ev_cb(struct os_event *ev) {
@@ -120,7 +121,7 @@ static void timer_ev_cb(struct os_event *ev) {
     dw1000_rng_instance_t * rng = inst->rng; 
 
     assert(inst->rng->nframes > 0);
-    twr_frame_t * previous_frame = rng->frames[(rng->idx-1)%rng->nframes];
+    //twr_frame_t * previous_frame = rng->frames[(rng->idx-1)%rng->nframes];
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
 
     if (inst->status.start_rx_error)
@@ -162,12 +163,12 @@ static void timer_ev_cb(struct os_event *ev) {
         uint32_t time_of_flight = (uint32_t) dw1000_rng_twr_to_tof(rng);
         float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
         dw1000_get_rssi(inst, &rssi);
-        print_frame("1st=", previous_frame);
-        print_frame("2nd=", frame);
         frame->code = DWT_DS_TWR_END;
-            printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_req\": %lX,"
+            printf("{\"utime\": %lu, \"src\":0x%x, \"dst\":0x%x, \"tof\": %lu,\"range\": %lu,\"res_req\": %lX,"
                    " \"rec_tra\": %lX, \"rssi\": %d}\n",
             os_cputime_ticks_to_usecs(os_cputime_get32()),
+            frame->src_address,
+            frame->dst_address,
             time_of_flight, 
             (uint32_t)(range * 1000), 
             (frame->response_timestamp - frame->request_timestamp),
@@ -179,8 +180,28 @@ static void timer_ev_cb(struct os_event *ev) {
     }
 }
 
+#if MYNEWT_VAL(DW1000_TIME)
+static void
+ccp_miss_cb(struct os_event *ev){
+    assert(ev != NULL);
+    assert(ev->ev_arg != NULL);
+    dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
+    //The receiver was turned on waiting for the CCP packet to come
+    //So first switch it off and then send the range request
+    dw1000_phy_forcetrxoff(inst);
+    //Here the timer is started at the edge of the slot
+    //So no need to wait anymore. Send directly
+    dw1000_rng_request(inst, 0xabab, DWT_DS_TWR);
+    //Start the timer again so that if the next CCP is missed again the timer task will kick in
+    os_callout_reset(&tdma_callout, OS_TICKS_PER_SEC*(inst->time->ccp_interval -MYNEWT_VAL(OS_LATENCY))*1e-6);
+}
+#endif
+
 static void init_timer(dw1000_dev_instance_t * inst) {
     os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, inst);
+#if MYNEWT_VAL(DW1000_TIME)
+    os_callout_init(&tdma_callout, os_eventq_dflt_get(), ccp_miss_cb, inst);
+#endif
     os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/100);
 }
 
@@ -189,20 +210,43 @@ static void
 time_postprocess(struct os_event * ev){
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
+
+    //If the CCP packet comes before the ccp_interval timeout then stop the timer so that it doesn't kicks in
+    os_callout_stop(&tdma_callout);
+
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
-    uint32_t delay = inst->slot_id * MYNEWT_VAL(TDMA_DELTA)/MYNEWT_VAL(TDMA_NSLOTS);
+    dw1000_time_instance_t* time = inst->time;
+
+    uint32_t ccp_period = MYNEWT_VAL(CCP_PERIOD);
+    uint32_t slot_delay = inst->slot_id * MYNEWT_VAL(TDMA_DELTA)/MYNEWT_VAL(TDMA_NSLOTS);
+    uint32_t delay = 0;
+    //Guard time calculation & total delay calculation
+    //Guard time is calculated as the slot_id*clock_offset/no_of_slots
+    //If the native timer is running fast then subtract the guard_time from the slot_delay
+    if(ccp_period < time->ccp_interval){
+        uint32_t guard_time = (inst->slot_id*(time->ccp_interval - ccp_period))/MYNEWT_VAL(TDMA_NSLOTS);
+        delay = slot_delay - guard_time;
+    //If the native timer is running slower then add the guard_time from the slot_delay so that it waits for extra time
+    }else{
+        uint64_t guard_time = (inst->slot_id*(ccp_period - time->ccp_interval))/MYNEWT_VAL(TDMA_NSLOTS);
+        delay = slot_delay + guard_time;
+    }
     //Calculate the transmission timestamp using the CCP reception timestamp
-    printf("{\"systime\": %llu, \"txtimestamp\": %llu, \"ccp_interval\": %llu}\n",dw1000_read_systime(inst),time_relative(inst,delay),inst->time->ccp_interval);
-    inst->txtimestamp = time_relative(inst,delay);
+    inst->txtimestamp = time_absolute(inst,time->ccp_reception_timestamp,delay);
+    
     //TODO: Debug the issue with wrong reception timestamp being notified at times
     //In those cases the delay value will become more than the CCP period or will go to a value behind the current systime
     //For now just drop such events
-    if((abs((inst->txtimestamp - dw1000_read_systime(inst))*15.65*1e-6) < MYNEWT_VAL(CCP_PERIOD)) && dw1000_read_systime(inst) < inst->txtimestamp)
+    if((abs((inst->txtimestamp - time->ccp_reception_timestamp)*15.65*1e-6) < MYNEWT_VAL(CCP_PERIOD)) && dw1000_read_systime(inst) < inst->txtimestamp)
         dw1000_rng_request_delay_start(inst,0xabab,inst->txtimestamp, DWT_DS_TWR);
     else{
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst);
     }
+    //Start a timer task with ccp_interval as the timeperiod
+    //This ensures if the CCP packet is missed still the ranging happens at the slot boundary
+    //OS_LATENCY is added to subtract the time expired for the ranging to happen
+    os_callout_reset(&tdma_callout, OS_TICKS_PER_SEC*(time->ccp_interval - MYNEWT_VAL(OS_LATENCY))*1e-6);
 }
 #endif
 
