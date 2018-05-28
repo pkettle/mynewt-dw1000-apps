@@ -106,10 +106,10 @@ void print_frame(const char * name, twr_frame_t *twr ){
 
 /* The timer callout */
 static struct os_callout blinky_callout;
-static struct os_callout tdma_callout;
+static void timer_ev_cb(struct os_event* ev);
 
 #define SAMPLE_FREQ 128.0
-static void timer_ev_cb(struct os_event *ev) {
+static void timer_ev_cb(struct os_event* ev) {
     float rssi;
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
@@ -121,9 +121,7 @@ static void timer_ev_cb(struct os_event *ev) {
     dw1000_rng_instance_t * rng = inst->rng; 
 
     assert(inst->rng->nframes > 0);
-    //twr_frame_t * previous_frame = rng->frames[(rng->idx-1)%rng->nframes];
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
-
     if (inst->status.start_rx_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\": \"start_rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.start_tx_error)
@@ -133,11 +131,11 @@ static void timer_ev_cb(struct os_event *ev) {
     if (inst->status.rx_timeout_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
    
-    if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error 
+    if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error
         ||  inst->status.rx_timeout_error){
+        inst->status.rx_timeout_error = inst->status.start_tx_error = inst->status.rx_error = 0;
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst);
-        inst->status.rx_timeout_error = inst->status.start_tx_error = inst->status.rx_error = 0; 
     }
 
     else if (frame->code == DWT_SS_TWR_FINAL) {
@@ -180,28 +178,8 @@ static void timer_ev_cb(struct os_event *ev) {
     }
 }
 
-#if MYNEWT_VAL(DW1000_TIME)
-static void
-ccp_miss_cb(struct os_event *ev){
-    assert(ev != NULL);
-    assert(ev->ev_arg != NULL);
-    dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
-    //The receiver was turned on waiting for the CCP packet to come
-    //So first switch it off and then send the range request
-    dw1000_phy_forcetrxoff(inst);
-    //Here the timer is started at the edge of the slot
-    //So no need to wait anymore. Send directly
-    dw1000_rng_request(inst, 0xabab, DWT_DS_TWR);
-    //Start the timer again so that if the next CCP is missed again the timer task will kick in
-    os_callout_reset(&tdma_callout, OS_TICKS_PER_SEC*(inst->time->ccp_interval -MYNEWT_VAL(OS_LATENCY))*1e-6);
-}
-#endif
-
 static void init_timer(dw1000_dev_instance_t * inst) {
     os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, inst);
-#if MYNEWT_VAL(DW1000_TIME)
-    os_callout_init(&tdma_callout, os_eventq_dflt_get(), ccp_miss_cb, inst);
-#endif
     os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/100);
 }
 
@@ -210,9 +188,6 @@ static void
 time_postprocess(struct os_event * ev){
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
-
-    //If the CCP packet comes before the ccp_interval timeout then stop the timer so that it doesn't kicks in
-    os_callout_stop(&tdma_callout);
 
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     dw1000_time_instance_t* time = inst->time;
@@ -243,10 +218,6 @@ time_postprocess(struct os_event * ev){
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst);
     }
-    //Start a timer task with ccp_interval as the timeperiod
-    //This ensures if the CCP packet is missed still the ranging happens at the slot boundary
-    //OS_LATENCY is added to subtract the time expired for the ranging to happen
-    os_callout_reset(&tdma_callout, OS_TICKS_PER_SEC*(time->ccp_interval - MYNEWT_VAL(OS_LATENCY))*1e-6);
 }
 #endif
 
@@ -284,6 +255,9 @@ int main(int argc, char **argv){
     dw1000_time_init(inst,inst->slot_id);
     dw1000_time_set_postprocess(inst, &time_postprocess);
 #endif
+    dw1000_set_address16(inst,inst->my_short_address);
+    dw1000_mac_framefilter(inst,DWT_FF_DATA_EN|DWT_FF_RSVD_EN);
+
     init_timer(inst);
     dw1000_set_rx_timeout(inst, 0);
     dw1000_start_rx(inst);

@@ -101,7 +101,6 @@ void print_frame(const char * name, twr_frame_t *twr ){
 
 /* The timer callout */
 static struct os_callout blinky_callout;
-bool start_ranging = false;
 /*
  * Event callback function for timer events. It toggles the led pin.
 */
@@ -220,6 +219,9 @@ int main(int argc, char **argv){
     printf("partID = 0x%lX\n",inst->partID);
     printf("lotID = 0x%lX\n",inst->lotID);
     printf("xtal_trim = 0x%X\n",inst->xtal_trim);
+
+    dw1000_set_address16(inst,inst->my_short_address);
+    dw1000_mac_framefilter(inst,DWT_FF_DATA_EN);
   
     init_timer(inst);
     dw1000_set_rx_timeout(inst,0);
