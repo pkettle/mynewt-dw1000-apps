@@ -46,11 +46,11 @@
 
 static dwt_config_t mac_config = {
     .chan = 5,                          // Channel number. 
-    .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
+    .prf = DWT_PRF_16M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 9,                        // TX preamble code. Used in TX only.
-    .rxCode = 9,                        // RX preamble code. Used in RX only.
+    .txCode = 8,                        // TX preamble code. Used in TX only.
+    .rxCode = 8,                        // RX preamble code. Used in RX only.
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
@@ -109,18 +109,27 @@ static struct os_callout blinky_callout;
 static void timer_ev_cb(struct os_event* ev);
 
 #define SAMPLE_FREQ 128.0
+static uint32_t prev_cnt = 0;
 static void timer_ev_cb(struct os_event* ev) {
     float rssi;
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
 
     hal_gpio_toggle(LED_BLINK_PIN);
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/SAMPLE_FREQ);
     
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
     dw1000_rng_instance_t * rng = inst->rng; 
 
     assert(inst->rng->nframes > 0);
+	
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC*(MYNEWT_VAL(CCP_PERIOD) - MYNEWT_VAL(OS_LATENCY))*1e-6);
+
+    dw1000_phy_forcetrxoff(inst);
+    dw1000_rng_request_delay_start(inst, 0x6001, inst->txtimestamp, DWT_DS_TWR);
+    uint32_t cur_cnt = os_cputime_ticks_to_usecs(os_cputime_get32());
+    prev_cnt = cur_cnt;
+    inst->txtimestamp = time_absolute(inst, (uint64_t)(inst->txtimestamp), MYNEWT_VAL(CCP_PERIOD));
+
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
     if (inst->status.start_rx_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\": \"start_rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
@@ -180,46 +189,33 @@ static void timer_ev_cb(struct os_event* ev) {
 
 static void init_timer(dw1000_dev_instance_t * inst) {
     os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, inst);
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/100);
 }
 
-#if MYNEWT_VAL(DW1000_TIME)
 static void
-time_postprocess(struct os_event * ev){
+ccp_postprocess(struct os_event * ev){
+
+    os_callout_stop(&blinky_callout);
+
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
-
+    printf("CCP post \n");
     dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)ev->ev_arg;
-    dw1000_time_instance_t* time = inst->time;
+    dw1000_ccp_instance_t * ccp = inst->ccp;
+    //ccp_frame_t * previous_frame = ccp->frames[(ccp->idx-1)%ccp->nframes];
+    ccp_frame_t * frame = ccp->frames[(ccp->idx)%ccp->nframes];
 
-    uint32_t ccp_period = MYNEWT_VAL(CCP_PERIOD);
     uint32_t slot_delay = inst->slot_id * MYNEWT_VAL(TDMA_DELTA)/MYNEWT_VAL(TDMA_NSLOTS);
     uint32_t delay = 0;
     //Guard time calculation & total delay calculation
     //Guard time is calculated as the slot_id*clock_offset/no_of_slots
     //If the native timer is running fast then subtract the guard_time from the slot_delay
-    if(ccp_period < time->ccp_interval){
-        uint32_t guard_time = (inst->slot_id*(time->ccp_interval - ccp_period))/MYNEWT_VAL(TDMA_NSLOTS);
-        delay = slot_delay - guard_time;
-    //If the native timer is running slower then add the guard_time from the slot_delay so that it waits for extra time
-    }else{
-        uint64_t guard_time = (inst->slot_id*(ccp_period - time->ccp_interval))/MYNEWT_VAL(TDMA_NSLOTS);
-        delay = slot_delay + guard_time;
-    }
-    //Calculate the transmission timestamp using the CCP reception timestamp
-    inst->txtimestamp = time_absolute(inst,time->ccp_reception_timestamp,delay);
+    uint32_t guard_time = rng_config.tx_holdoff_delay;
+    delay = slot_delay + guard_time;
     
-    //TODO: Debug the issue with wrong reception timestamp being notified at times
-    //In those cases the delay value will become more than the CCP period or will go to a value behind the current systime
-    //For now just drop such events
-    if((abs((inst->txtimestamp - time->ccp_reception_timestamp)*15.65*1e-6) < MYNEWT_VAL(CCP_PERIOD)) && dw1000_read_systime(inst) < inst->txtimestamp)
-        dw1000_rng_request_delay_start(inst,0xabab,inst->txtimestamp, DWT_DS_TWR);
-    else{
-        dw1000_set_rx_timeout(inst, 0);
-        dw1000_start_rx(inst);
-    }
+    inst->txtimestamp = time_absolute(inst, (uint64_t)(frame->reception_timestamp), delay);
+
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC*(delay - MYNEWT_VAL(OS_LATENCY))*1e-6);
 }
-#endif
 
 int main(int argc, char **argv){
     int rc;
@@ -239,11 +235,15 @@ int main(int argc, char **argv){
     inst->slot_id = MYNEWT_VAL(SLOT_ID);
 
     dw1000_set_panid(inst,inst->PANID);
+    dw1000_set_address16(inst,inst->my_short_address);
+
     dw1000_mac_init(inst, &mac_config);
+    dw1000_mac_framefilter(inst,DWT_FF_DATA_EN|DWT_FF_RSVD_EN);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
 #if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)
     dw1000_ccp_init(inst, 2, MYNEWT_VAL(UUID_CCP_MASTER));
+    dw1000_ccp_set_postprocess(inst, ccp_postprocess);
 #endif
     printf("device_id=%lX\n",inst->device_id);
     printf("PANID=%X\n",inst->PANID);
@@ -251,12 +251,6 @@ int main(int argc, char **argv){
     printf("partID =%lX\n",inst->partID);
     printf("lotID =%lX\n",inst->lotID);
     printf("xtal_trim =%X\n",inst->xtal_trim);
-#if MYNEWT_VAL(DW1000_TIME)    
-    dw1000_time_init(inst,inst->slot_id);
-    dw1000_time_set_postprocess(inst, &time_postprocess);
-#endif
-    dw1000_set_address16(inst,inst->my_short_address);
-    dw1000_mac_framefilter(inst,DWT_FF_DATA_EN|DWT_FF_RSVD_EN);
 
     init_timer(inst);
     dw1000_set_rx_timeout(inst, 0);
@@ -267,6 +261,5 @@ int main(int argc, char **argv){
     }
 
     assert(0);
-
     return rc;
 }

@@ -1,7 +1,7 @@
 syscfg.vals:
     # Route console to RTT
-    CONSOLE_UART: 1
-    CONSOLE_RTT: 0
+    CONSOLE_UART: 0
+    CONSOLE_RTT: 1
     DW1000_DEVICE_0: 1
     DW1000_SS_TWR_ENABLED: 1
     DW1000_DS_TWR_ENABLED: 1
@@ -14,7 +14,7 @@ syscfg.defs:
     DEVICE_ID:
         description: >
             Device ID
-        value: ((uint16_t){0x1234})
+        value: ((uint16_t){0x6001})
     UUID_CCP_MASTER:
         description: >
             Clock Master UUID
