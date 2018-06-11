@@ -244,9 +244,11 @@ static void timer_ev_cb(struct os_event *ev) {
         float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
         dw1000_get_rssi(inst, &rssi);
         frame->code = DWT_DS_TWR_END;
-            LOG_INFO(&my_log, LOG_MODULE_DEFAULT, "Range %lu %lu ", 
+#if MYNEWT_VAL(DW1000_LOG)
+            LOG_INFO(&my_log, LOG_MODULE_DEFAULT, "Range %lu Time_of_flight %lu ", 
                 (uint32_t)(range*1000),time_of_flight);
             STATS_INC(g_stats_range, counts);
+#endif
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
