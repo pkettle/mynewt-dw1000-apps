@@ -125,7 +125,7 @@ static void timer_ev_cb(struct os_event* ev) {
     os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC*(MYNEWT_VAL(CCP_PERIOD) - MYNEWT_VAL(OS_LATENCY))*1e-6);
 
     dw1000_phy_forcetrxoff(inst);
-    dw1000_rng_request_delay_start(inst, 0x6001, inst->txtimestamp, DWT_DS_TWR);
+    dw1000_rng_request_delay_start(inst, 0xabab, inst->txtimestamp, DWT_DS_TWR);
     uint32_t cur_cnt = os_cputime_ticks_to_usecs(os_cputime_get32());
     prev_cnt = cur_cnt;
     inst->txtimestamp = time_absolute(inst, (uint64_t)(inst->txtimestamp), MYNEWT_VAL(CCP_PERIOD));

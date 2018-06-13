@@ -43,40 +43,40 @@ newt target set tag0 bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set tag0 build_profile=debug 
 newt target amend tag0 syscfg=DEVICE_ID=0x1111
 newt target amend tag0 syscfg=SLOT_ID=1
-newt build tag0
-newt create-image tag0 1.0.0
-newt load tag0
+newt run tag0 0
 newt target amend tag0 syscfg=DEVICE_ID=0x1112
 newt target amend tag0 syscfg=SLOT_ID=2
-newt build tag0
-newt create-image tag0 1.0.0
-newt load tag0
+newt run tag0 0
 newt target amend tag0 syscfg=DEVICE_ID=0x1113
 newt target amend tag0 syscfg=SLOT_ID=3
-newt build tag0
-newt create-image tag0 1.0.0
-newt load tag0
+newt run tag0 0
 newt target amend tag0 syscfg=DEVICE_ID=0x1114
 newt target amend tag0 syscfg=SLOT_ID=4
-newt build tag0
-newt create-image tag0 1.0.0
-newt load tag0
+newt run tag0 0
+newt target amend tag0 syscfg=DEVICE_ID=0x1115
+newt target amend tag0 syscfg=SLOT_ID=5
+newt run tag0 0
+newt target amend tag0 syscfg=DEVICE_ID=0x1116
+newt target amend tag0 syscfg=SLOT_ID=6
+newt run tag0 0
+newt target amend tag0 syscfg=DEVICE_ID=0x1117
+newt target amend tag0 syscfg=SLOT_ID=7
+newt run tag0 0
+newt target amend tag0 syscfg=DEVICE_ID=0x1118
+newt target amend tag0 syscfg=SLOT_ID=8
+newt run tag0 0
 
 newt target create node0
 newt target set node0 app=apps/time_node
 newt target set node0 bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set node0 build_profile=debug 
 newt target amend node0 syscfg=DEVICE_ID=0xabab
-newt build node0
-newt create-image node0 1.0.0
-newt load node0
+newt run node0 0
 
 newt target create clock_master
 newt target set clock_master app=apps/clock_master
 newt target set clock_master bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set clock_master build_profile=debug 
-newt build clock_master
-newt create-image clock_master 1.0.0
-newt load clock_master
+newt run clock_master 0
 
 ```
