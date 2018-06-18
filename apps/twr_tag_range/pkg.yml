@@ -17,9 +17,9 @@
 # under the License.
 #
 
-pkg.name: apps/aoa_tag
+pkg.name: apps/twr_tag_range
 pkg.type: app
-pkg.description: "Basic aoa tag example"
+pkg.description: "Basic TWR tag ranging example"
 pkg.author: "Paul Kettle <paul.kettle@decawave.com>"
 pkg.homepage: "http://www.decawave.com/"
 pkg.keywords:
@@ -31,14 +31,12 @@ pkg.deps:
     - "@apache-mynewt-core/hw/hal"
     - "@apache-mynewt-core/sys/console/full" 
     - "@apache-mynewt-core/sys/shell"
-    - "@apache-mynewt-core/encoding/json"
     - "@mynewt-dw1000-core/hw/drivers/dw1000"
 
+    
 pkg.cflags:
     - "-std=gnu99"
     - "-fms-extensions"
-    - "-DNRF52"
     
 pkg.lflags:
     - "-lm"
-    

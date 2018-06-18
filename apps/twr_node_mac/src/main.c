@@ -54,8 +54,8 @@ static dwt_config_t mac_config = {
     .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 11,                        // TX preamble code. Used in TX only. 
-    .rxCode = 11,                        // RX preamble code. Used in RX only. 
+    .txCode = 9,                        // TX preamble code. Used in TX only. 
+    .rxCode = 9,                        // RX preamble code. Used in RX only. 
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
@@ -204,13 +204,12 @@ int main(int argc, char **argv){
 
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
-    inst->my_long_address = ((uint64_t) inst->device_id << 32) + inst->partID;
     
+#if MYNEWT_VAL(DW1000_MAC_FILTERING)
+    dw1000_set_address16(inst, inst->my_short_address);
+#endif 
     dw1000_set_panid(inst,inst->PANID);
     dw1000_mac_init(inst, &mac_config);
-    dw1000_set_address16(inst, inst->my_short_address);
-    dw1000_mac_framefilter(inst, DWT_FF_DATA_EN );
-   
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
 #if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)

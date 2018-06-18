@@ -31,6 +31,7 @@
 #include "mcu/mcu_sim.h"
 #endif
 
+#include <log/log.h>
 #include "dw1000/dw1000_dev.h"
 #include "dw1000/dw1000_hal.h"
 #include "dw1000/dw1000_phy.h"
@@ -49,7 +50,6 @@
 #endif
 
 #include <shell/shell.h>
-#include <log/log.h>
 #include <stats/stats.h>
 #include <config/config.h>
 #include "flash_map/flash_map.h"
@@ -75,8 +75,9 @@ static uint8_t test8;
 static uint8_t test8_shadow;
 static char test_str[32];
 static uint32_t cbmem_buf[MAX_CBMEM_BUF];
-static struct log my_log;
+//static struct cbmem error_mem;
 static struct cbmem cbmem;
+static struct cbmem debug_mem;
 static STATS_SECT_DECL(range) g_stats_range;
 
 static char *test_conf_get(int argc, char **argv, char *val, int max_len);
@@ -90,8 +91,8 @@ static dwt_config_t mac_config = {
     .prf = DWT_PRF_64M,                 // Pulse repetition frequency. 
     .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
     .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 9,                        // TX preamble code. Used in TX only. 
-    .rxCode = 9,                        // RX preamble code. Used in RX only. 
+    .txCode = 11,                        // TX preamble code. Used in TX only. 
+    .rxCode = 11,                        // RX preamble code. Used in RX only. 
     .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
     .dataRate = DWT_BR_6M8,             // Data rate. 
     .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
@@ -185,19 +186,6 @@ static twr_frame_t twr[] = {
     }
 };
 
-void print_frame(const char * name, twr_frame_t *twr ){
-    printf("%s{\n\tfctrl:0x%04X,\n", name, twr->fctrl);
-    printf("\tseq_num:0x%02X,\n", twr->seq_num);
-    printf("\tPANID:0x%04X,\n", twr->PANID);
-    printf("\tdst_address:0x%04X,\n", twr->dst_address);
-    printf("\tsrc_address:0x%04X,\n", twr->src_address);
-    printf("\tcode:0x%04X,\n", twr->code);
-    printf("\treception_timestamp:0x%08lX,\n", twr->reception_timestamp);
-    printf("\ttransmission_timestamp:0x%08lX,\n", twr->transmission_timestamp);
-    printf("\trequest_timestamp:0x%08lX,\n", twr->request_timestamp);
-    printf("\tresponse_timestamp:0x%08lX\n}\n", twr->response_timestamp);
-}
-
 /* The timer callout */
 static struct os_callout blinky_callout;
 
@@ -216,16 +204,24 @@ static void timer_ev_cb(struct os_event *ev) {
     assert(inst->rng->nframes > 0);
 
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
-
+#if MYNEWT_VAL(DW1000_LOG)
     if (inst->status.start_rx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\": \"start_rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+    
+        LOG_ERROR(&inst->os_error_log, LOG_MODULE_DEFAULT,"start_rx_error\"\n");
+
     if (inst->status.start_tx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"start_tx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+
+        LOG_ERROR(&inst->os_error_log, LOG_MODULE_DEFAULT,"start_tx_error\"\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+
     if (inst->status.rx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+
+        LOG_ERROR(&inst->os_error_log, LOG_MODULE_DEFAULT,"rx_error\"\n");
+
     if (inst->status.rx_timeout_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-   
+
+        LOG_ERROR(&inst->os_error_log, LOG_MODULE_DEFAULT,"rx_timeout_error\"\n");
+#endif
+
     if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error 
         ||  inst->status.rx_timeout_error){
         dw1000_set_rx_timeout(inst, 0);
@@ -244,15 +240,17 @@ static void timer_ev_cb(struct os_event *ev) {
         float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
         dw1000_get_rssi(inst, &rssi);
         frame->code = DWT_DS_TWR_END;
+
 #if MYNEWT_VAL(DW1000_LOG)
-            LOG_INFO(&my_log, LOG_MODULE_DEFAULT, "Range %lu Time_of_flight %lu ", 
+            LOG_INFO(&inst->os_log, LOG_MODULE_DEFAULT, "Range %lu Time_of_flight %lu ", 
                 (uint32_t)(range*1000),time_of_flight);
             STATS_INC(g_stats_range, counts);
 #endif
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
-}
+ }
+
 
 static void init_timer(dw1000_dev_instance_t * inst) {
     os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, inst);
@@ -300,8 +298,9 @@ int main(int argc, char **argv){
     rc = conf_register(&test_conf_handler);
     assert(rc == 0);
     cbmem_init(&cbmem, cbmem_buf, MAX_CBMEM_BUF);
-    log_register("log", &my_log, &log_cbmem_handler, &cbmem, LOG_SYSLEVEL);
-
+    log_register("log", &inst->os_log, &log_cbmem_handler, &cbmem, LOG_LEVEL_INFO);    
+    log_register("Error_log", &inst->os_error_log, &log_console_handler,NULL, LOG_LEVEL_ERROR);
+    log_register("Debug_log", &inst->os_debug_log, &log_fcb_handler,&debug_mem, LOG_LEVEL_DEBUG);
     stats_init(STATS_HDR(g_stats_range),
                STATS_SIZE_INIT_PARMS(g_stats_range, STATS_SIZE_32),
                STATS_NAME_INIT_PARMS(range));

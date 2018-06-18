@@ -5,17 +5,18 @@ syscfg.vals:
     DW1000_DEVICE_0: 1
     DW1000_SS_TWR_ENABLED: 1
     DW1000_DS_TWR_ENABLED: 1
-    DW1000_DS_TWR_EXT_ENABLED: 1
-    DW1000_CLOCK_CALIBRATION: 0
+    DW1000_DS_TWR_EXT_ENABLED: 0
     DW1000_PAN: 0
-    
+    DW1000_CLOCK_CALIBRATION: 1
+    DW1000_RANGE: 1
+    # OS_SYSVIEW: 1
+
 syscfg.defs:
     DEVICE_ID:
         description: >
             Device ID
-        value: ((uint16_t){0x1234})
+        value: ((uint16_t){0x6003})
     UUID_CCP_MASTER:
         description: >
             Clock Master UUID
-        value: ((uint16_t){0x8000})         
-    
+        value: ((uint16_t){0x8000})    

@@ -17,9 +17,9 @@
 # under the License.
 #
 
-pkg.name: apps/aoa_node
+pkg.name: apps/twr_node_range
 pkg.type: app
-pkg.description: "Basic AoA node example"
+pkg.description: "Basic TWR node ranging example"
 pkg.author: "Paul Kettle <paul.kettle@decawave.com>"
 pkg.homepage: "http://www.decawave.com/"
 pkg.keywords:
@@ -37,8 +37,6 @@ pkg.deps:
 pkg.cflags:
     - "-std=gnu99"
     - "-fms-extensions"
-    - "-DNRF52840_XXAA"
-    
+
 pkg.lflags:
     - "-lm"
-    
