@@ -33,7 +33,32 @@ pkg.deps:
     - "@apache-mynewt-core/sys/shell"
     - "@apache-mynewt-core/encoding/json"
     - "@mynewt-dw1000-core/hw/drivers/dw1000"
+    - "@apache-mynewt-core/test/flash_test"
+    - "@apache-mynewt-core/mgmt/imgmgr"
+    - "@apache-mynewt-core/mgmt/newtmgr"
+    - "@apache-mynewt-core/mgmt/newtmgr/transport/nmgr_shell"
+    - "@apache-mynewt-core/kernel/os"
+    - "@apache-mynewt-core/boot/bootutil"
+    - "@apache-mynewt-core/sys/shell"
+    - "@apache-mynewt-core/sys/config"
+    - "@apache-mynewt-core/sys/console/full"
+    - "@apache-mynewt-core/sys/id"
+    - "@apache-mynewt-core/sys/log/full"
+    - "@apache-mynewt-core/sys/stats/full"
+    - "@apache-mynewt-core/boot/split"
+    - "@apache-mynewt-core/test/crash_test"
+    - "@apache-mynewt-core/test/runtest"
 
+pkg.deps.I2C_0: test/i2c_scan
+pkg.deps.I2C_1: test/i2c_scan
+pkg.deps.I2C_2: test/i2c_scan
+
+pkg.deps.CONFIG_NFFS:
+    - fs/nffs
+
+pkg.deps.CONFIG_FCB:
+    - "@apache-mynewt-core/fs/fcb"
+    
 pkg.cflags:
     - "-std=gnu99"
     - "-fms-extensions"

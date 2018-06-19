@@ -75,7 +75,9 @@ static uint8_t test8;
 static uint8_t test8_shadow;
 static char test_str[32];
 static uint32_t cbmem_buf[MAX_CBMEM_BUF];
-//static struct cbmem error_mem;
+static uint32_t error_buf[MAX_CBMEM_BUF];
+static uint32_t debug_buf[MAX_CBMEM_BUF];
+static struct cbmem error_mem;
 static struct cbmem cbmem;
 static struct cbmem debug_mem;
 static STATS_SECT_DECL(range) g_stats_range;
@@ -299,8 +301,10 @@ int main(int argc, char **argv){
     assert(rc == 0);
     cbmem_init(&cbmem, cbmem_buf, MAX_CBMEM_BUF);
     log_register("log", &inst->os_log, &log_cbmem_handler, &cbmem, LOG_LEVEL_INFO);    
-    log_register("Error_log", &inst->os_error_log, &log_console_handler,NULL, LOG_LEVEL_ERROR);
-    log_register("Debug_log", &inst->os_debug_log, &log_fcb_handler,&debug_mem, LOG_LEVEL_DEBUG);
+    cbmem_init(&error_mem, error_buf, MAX_CBMEM_BUF);
+    log_register("Error_log", &inst->os_error_log, &log_cbmem_handler,&error_mem, LOG_LEVEL_ERROR);
+    cbmem_init(&debug_mem, debug_buf, MAX_CBMEM_BUF);
+    log_register("Debug_log", &inst->os_debug_log, &log_cbmem_handler,&debug_mem, LOG_LEVEL_DEBUG);
     stats_init(STATS_HDR(g_stats_range),
                STATS_SIZE_INIT_PARMS(g_stats_range, STATS_SIZE_32),
                STATS_NAME_INIT_PARMS(range));
