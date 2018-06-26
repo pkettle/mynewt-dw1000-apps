@@ -51,4 +51,37 @@ telnet localhost 19021
 
 After connecting both the tag and node, on the console type help to see what commands are supported for your application.
 
+### To test the applications with newtmgr tool
+
+Enable UART and disable RTT in twr_node_log and twr_tag_log and change the UART pins in hw/bsp/dwm1001/syscfg.yml
+
+## To run newtmgr commands
+
+Establish connections using newtmgr commands.
+
+```
+newtmgr conn add port_0 type=serial connstring="dev=/dev/ttyACM0" (based on device available)
+                                
+                                  (or)
+
+newtmgr conn add port_1 type=serial connstring="dev=/dev/ttyACM1" (based on device available)
+```
+
+Check the logs on desired port
+
+```
+newtmgr log level_list -c port_0/port_1 - shows log levels on device
+
+newtmgr log list -c port_0/port_1 - shows log names on a device
+
+newtmgr log show -c port_0/port_1 - shows all the logs on a device
+
+```
+Likewise, there are many newtmgr commands to display the logs,echo,reset,statistics,memory acquired,tasks initiated etc.
+
+To use those commands, please find below reference
+
+https://mynewt.apache.org/latest/newtmgr/command_list/newtmgr_config/
+
+
 
