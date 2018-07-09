@@ -21,35 +21,38 @@ twr_tag_log   // Elementary use-case, no network management layer, no auto site 
 Each twr_node_log and twr_tag_log are build as follows. 
 (executed from the mynewt-dw1000-app directory).
 
-### To create and build twr_node_log
+### To test the applications with newtmgr tool
+
+Enable UART and disable RTT in twr_node_log and twr_tag_log and change the UART pins in hw/bsp/dwm1001/syscfg.yml
+
+### To create twr_node_log
 ```
 newt target create node_log
 newt target set node_log app=apps/twr_node_log
 newt target set node_log bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set node_log build_profile=debug
 ```
-### To run node_log
+### To build and run node_log
 ```
-newt run node_log 0
+newt build node_log
+newt create-image node_log 1.0.0
+newt load node_log 
 ```
-### To create and build twr_tag_log
+### To create twr_tag_log
 ```
 newt target create tag_log
 newt target set tag_log app=apps/twr_tag_log
 newt target set tag_log bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set tag_log build_profile=debug
 ```
-### To run tag_log
+### To build and run tag_log
 ```
-newt run tag_log 0
+newt build tag_log
+newt create-image tag_log 1.0.0
+newt load tag_log
 ```
 
-The examples are configured to use the RTT interface. To launch the console with RTT interface,use 
-
-
-telnet localhost 19021
-
-After connecting both the tag and node, on the console type help to see what commands are supported for your application.
+The examples are configured to use the UART interface. 
 
 ### To test the applications with newtmgr tool
 
@@ -60,28 +63,38 @@ Enable UART and disable RTT in twr_node_log and twr_tag_log and change the UART 
 Establish connections using newtmgr commands.
 
 ```
-newtmgr conn add port_0 type=serial connstring="dev=/dev/ttyACM0" (based on device available)
+To check the logs over shell
+
+newtmgr conn add port_0 type=serial connstring="dev=/dev/ttyACM0" ----> (tag_log)
                                 
-                                  (or)
+                                  (and)
 
-newtmgr conn add port_1 type=serial connstring="dev=/dev/ttyACM1" (based on device available)
+newtmgr conn add port_1 type=serial connstring="dev=/dev/ttyACM1" ----> (node_log)
 ```
+```
+To check the logs over BLE
 
+newtmgr conn add myble type=ble connstring="peer_name=nimble-bleprph"
+```
 Check the logs on desired port
 
 ```
-newtmgr log level_list -c port_0/port_1 - shows log levels on device
+check the logs in tag_log as newtmgr APIs are in twr_tag_log
 
-newtmgr log list -c port_0/port_1 - shows log names on a device
+newtmgr log level_list -c port_0 - shows log levels on device
 
-newtmgr log show -c port_0/port_1 - shows all the logs on a device
+newtmgr log list -c port_0 - shows log names on a device
 
+newtmgr log show -c port_0 - shows all the logs on a device
+
+newtmgr log show -c ble - shows all the logs on a device over BLE
 ```
 Likewise, there are many newtmgr commands to display the logs,echo,reset,statistics,memory acquired,tasks initiated etc.
 
 To use those commands, please find below reference
 
 https://mynewt.apache.org/latest/newtmgr/command_list/newtmgr_config/
+
 
 
 
