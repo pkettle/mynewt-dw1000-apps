@@ -25,7 +25,7 @@ Each twr_node_log and twr_tag_log are build as follows.
 
 Enable UART and disable RTT in twr_node_log and twr_tag_log and change the UART pins in hw/bsp/dwm1001/syscfg.yml
 
-### To create twr_node_log
+### To create target for twr_node_log
 ```
 newt target create node_log
 newt target set node_log app=apps/twr_node_log
@@ -38,7 +38,7 @@ newt build node_log
 newt create-image node_log 1.0.0
 newt load node_log 
 ```
-### To create twr_tag_log
+### To create target for twr_tag_log
 ```
 newt target create tag_log
 newt target set tag_log app=apps/twr_tag_log
@@ -56,31 +56,23 @@ The examples are configured to use the UART interface.
 
 ### To test the applications with newtmgr tool
 
-Enable UART and disable RTT in twr_node_log and twr_tag_log and change the UART pins in hw/bsp/dwm1001/syscfg.yml
-
 ## To run newtmgr commands
 
 Establish connections using newtmgr commands.
 
 ```
-To check the logs over shell
+To establish connection over shell
 
 newtmgr conn add port_0 type=serial connstring="dev=/dev/ttyACM0" ----> (tag_log)
-                                
-                                  (and)
-
-newtmgr conn add port_1 type=serial connstring="dev=/dev/ttyACM1" ----> (node_log)
 ```
 ```
-To check the logs over BLE
+To establish connection over BLE
 
 newtmgr conn add myble type=ble connstring="peer_name=nimble-bleprph"
 ```
-Check the logs on desired port
+### To check the logs on desired port
 
 ```
-check the logs in tag_log as newtmgr APIs are in twr_tag_log
-
 newtmgr log level_list -c port_0 - shows log levels on device
 
 newtmgr log list -c port_0 - shows log names on a device
