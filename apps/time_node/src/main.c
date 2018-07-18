@@ -38,28 +38,6 @@
 #include <dw1000/dw1000_rng.h>
 #include <dw1000/dw1000_ftypes.h>
 
-static dwt_config_t mac_config = {
-    .chan = 5,                          // Channel number. 
-    .prf = DWT_PRF_16M,                 // Pulse repetition frequency. 
-    .txPreambLength = DWT_PLEN_256,     // Preamble length. Used in TX only. 
-    .rxPAC = DWT_PAC8,                 // Preamble acquisition chunk size. Used in RX only. 
-    .txCode = 8,                        // TX preamble code. Used in TX only.
-    .rxCode = 8,                        // RX preamble code. Used in RX only.
-    .nsSFD = 0,                         // 0 to use standard SFD, 1 to use non-standard SFD. 
-    .dataRate = DWT_BR_6M8,             // Data rate. 
-    .phrMode = DWT_PHRMODE_STD,         // PHY header mode. 
-    .sfdTO = (256 + 1 + 8 - 8)         // SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. 
-};
-
-static dw1000_phy_txrf_config_t txrf_config = { 
-        .PGdly = TC_PGDELAY_CH5,
-        //.power = 0x25456585
-        .BOOSTNORM = dw1000_power_value(DW1000_txrf_config_9db, 5),
-        .BOOSTP500 = dw1000_power_value(DW1000_txrf_config_9db, 5),
-        .BOOSTP250 = dw1000_power_value(DW1000_txrf_config_9db, 5),
-        .BOOSTP125 = dw1000_power_value(DW1000_txrf_config_9db, 5)
-};
-
 static dw1000_rng_config_t rng_config = {
     .tx_holdoff_delay = 0x0600,         // Send Time delay in usec.
     .rx_timeout_period = 0x8000         // Receive response timeout in usec
@@ -108,7 +86,6 @@ static struct os_callout blinky_callout;
 #define SAMPLE_FREQ 100.0
 
 static void timer_ev_cb(struct os_event *ev) {
-    float rssi;
     assert(ev != NULL);
     assert(ev->ev_arg != NULL);
 
@@ -120,31 +97,31 @@ static void timer_ev_cb(struct os_event *ev) {
     os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC/SAMPLE_FREQ);
 
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
-    
-    if (inst->status.start_rx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\": \"start_rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-    if (inst->status.start_tx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"start_tx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-    if (inst->status.rx_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-    if (inst->status.rx_timeout_error)
-        printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
 
-        if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error
-        ||  inst->status.rx_timeout_error){
-            inst->status.rx_timeout_error = inst->status.start_tx_error = inst->status.rx_error = 0; 
-            dw1000_set_rx_timeout(inst, 0);
-            dw1000_start_rx(inst);
+    if (inst->status.start_rx_error)
+	    printf("{\"utime\": %lu,\"timer_ev_cb\": \"start_rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+    if (inst->status.start_tx_error)
+	    printf("{\"utime\": %lu,\"timer_ev_cb\":\"start_tx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+    if (inst->status.rx_error)
+	    printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+    if (inst->status.rx_timeout_error)
+	    printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
+
+    if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error
+		    ||  inst->status.rx_timeout_error){
+	    inst->status.rx_timeout_error = inst->status.start_tx_error = inst->status.rx_error = 0; 
+	    dw1000_set_rx_timeout(inst, 0);
+	    dw1000_start_rx(inst);
     }
 
     if (frame->code == DWT_SS_TWR_FINAL) {
-        uint32_t time_of_flight = (uint32_t) dw1000_rng_twr_to_tof(rng);
-        float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
-        dw1000_get_rssi(inst, &rssi);
-        print_frame("trw=", frame);
-        printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_req\": %lX,"
-                " \"rec_tra\": %lX, \"rssi\": %d}\n",
-                os_cputime_ticks_to_usecs(os_cputime_get32()),
+	    uint32_t time_of_flight = (uint32_t) dw1000_rng_twr_to_tof(rng);
+	    float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
+	    float rssi = dw1000_get_rssi(inst);
+	    print_frame("trw=", frame);
+	    printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_req\": %lX,"
+			    " \"rec_tra\": %lX, \"rssi\": %d}\n",
+			    os_cputime_ticks_to_usecs(os_cputime_get32()),
                 time_of_flight,
                 (uint32_t)(range * 1000),
                 (frame->response_timestamp - frame->request_timestamp),
@@ -158,7 +135,7 @@ static void timer_ev_cb(struct os_event *ev) {
     if (frame->code == DWT_DS_TWR_FINAL || frame->code == DWT_DS_TWR_EXT_FINAL) {
         uint32_t time_of_flight = (uint32_t) dw1000_rng_twr_to_tof(rng);
         float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
-        dw1000_get_rssi(inst, &rssi);
+        dw1000_get_rssi(inst);
         frame->code = DWT_DS_TWR_END;
 #if 0
         print_frame("1st=", previous_frame);
@@ -202,14 +179,14 @@ int main(int argc, char **argv){
     
     dw1000_dev_instance_t * inst = hal_dw1000_inst(0);
     dw1000_softreset(inst);
-    dw1000_phy_init(inst, &txrf_config);   
+    dw1000_phy_init(inst, NULL);   
 
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID);
     inst->my_long_address = ((uint64_t) inst->device_id << 32) + inst->partID;
     inst->slot_id = MYNEWT_VAL(SLOT_ID);
     dw1000_set_panid(inst,inst->PANID);
-    dw1000_mac_init(inst, &mac_config);
+    dw1000_mac_init(inst, NULL);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
 
