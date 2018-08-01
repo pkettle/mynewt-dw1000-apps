@@ -105,7 +105,7 @@ json_cir_encode(cir_t * cir, char * name, uint16_t nsize){
 void 
 json_cir_encode(cir_t * cir, uint32_t utime, char * name, uint16_t nsize){
 
-    printf("{\"utime\":%lu,\"%s\":{\"idx\":%u,\"real\":[",utime, name, cir->fp_idx);
+    printf("{\"utime\": %lu,\"%s\":{\"idx\":%u,\"real\":[",utime, name, cir->fp_idx);
     for (uint16_t i=0; i < nsize - 1; i++)
         printf("%d,", cir->array[i].real);
     printf("%d],", cir->array[nsize-1].real);
