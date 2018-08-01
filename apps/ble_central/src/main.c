@@ -267,8 +267,8 @@ btshell_print_adv_fields(const struct ble_hs_adv_fields *fields)
     }
 
     if (fields->mfg_data != NULL) {
-        console_printf("    mfg_data=");
-        print_bytes(fields->mfg_data, fields->mfg_data_len);
+        //console_printf("    mfg_data=");
+        //print_bytes(fields->mfg_data, fields->mfg_data_len);
         console_printf("\n");
     }
 }
@@ -917,14 +917,14 @@ btshell_decode_adv_data(uint8_t *adv_data, uint8_t adv_data_len, void *arg)
     struct btshell_scan_opts *scan_opts = arg;
     struct ble_hs_adv_fields fields;
 
-    console_printf(" length_data=%d data=", adv_data_len);
+    //console_printf(" length_data=%d data=", adv_data_len);
 
     if (scan_opts) {
         adv_data_len = min(adv_data_len, scan_opts->limit);
     }
 
-    print_bytes(adv_data, adv_data_len);
-    console_printf(" fields:\n");
+    //print_bytes(adv_data, adv_data_len);
+    console_printf("\n         fields:\n");
     ble_hs_adv_parse_fields(&fields, adv_data, adv_data_len);
     btshell_print_adv_fields(&fields);
     console_printf("\n");
@@ -1128,11 +1128,11 @@ btshell_gap_event(struct ble_gap_event *event, void *arg)
         uint8_t buf[len+1];
         memcpy(buf,event->notify_rx.om->om_data,len);
         buf[len+1] = '\0';
-        console_printf("data = %s\n",buf);
+        console_printf("data received from DEV = %c is %s \n",buf[0],buf+1);
         return 0;
         }
     case BLE_GAP_EVENT_NOTIFY_TX:
-        console_printf("notification tx event; status=%d attr_handle=%d "
+         console_printf("notification tx event; status=%d attr_handle=%d "
                        "indication=%d\n",
                        event->notify_tx.status,
                        event->notify_tx.attr_handle,
@@ -1140,7 +1140,7 @@ btshell_gap_event(struct ble_gap_event *event, void *arg)
         return 0;
 
     case BLE_GAP_EVENT_SUBSCRIBE:
-        console_printf("subscribe event; conn_handle=%d attr_handle=%d "
+         console_printf("subscribe event; conn_handle=%d attr_handle=%d "
                        "reason=%d prevn=%d curn=%d previ=%d curi=%d\n",
                        event->subscribe.conn_handle,
                        event->subscribe.attr_handle,
@@ -2088,7 +2088,7 @@ static void timer_ev_cb(struct os_event *ev) {
         call_scan();        
         do_scan = 0;
     }
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC * 2);
+    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC * 3);
 }
 
 

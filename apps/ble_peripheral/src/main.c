@@ -54,7 +54,7 @@ extern uint16_t g_console_conn_handle;
 extern uint16_t g_bleuart_attr_read_handle;
 
 static int bleuart_gap_event(struct ble_gap_event *event, void *arg);
-
+static struct os_callout ble_callout;
 /**
  * Enables advertising with the following parameters:
  *     o General discoverable mode.
@@ -205,6 +205,14 @@ int bleuart_write(void const* buffer, uint32_t size)
     return (0 == ble_gattc_notify_custom(g_console_conn_handle, g_bleuart_attr_read_handle, om)) ? size : 0;
 }
 
+static int count = 0;
+static void timer_ev_cb(struct os_event *ev) {
+    char str[25] ; 
+    sprintf(str,"%d %s %d",MYNEWT_VAL_BLE_DEVICE_ID,"Hello",count++);
+    bleuart_write((void const*)str, sizeof(str));
+    os_callout_reset(&ble_callout, OS_TICKS_PER_SEC * 1);
+}
+
 /**
  * main
  *
@@ -223,7 +231,6 @@ main(void)
 
     /* Set initial BLE device address. */
     memcpy(g_dev_addr, MYNEWT_VAL_BLE_PUBLIC_DEV_ADDR , 6);
-    char str[25] ;
     /* Initialize the BLE host. */
     log_register("ble_hs", &ble_hs_log, &log_console_handler, NULL,
                  LOG_SYSLEVEL);
@@ -236,11 +243,11 @@ main(void)
     /* Set the default device name. */
     rc = ble_svc_gap_device_name_set("DECAWAVE_BLE");
     assert(rc == 0);
-    int count = 0;
+    os_callout_init(&ble_callout, os_eventq_dflt_get(), timer_ev_cb, NULL);
+    os_callout_reset(&ble_callout, OS_TICKS_PER_SEC/100);
+
     while (1) {
         os_eventq_run(os_eventq_dflt_get());
-        sprintf(str,"%d %s %d",MYNEWT_VAL_BLE_DEVICE_ID,"Hello",count++);
-        bleuart_write((void const*)str, sizeof(str));
     }
     /* Never exit */
 
