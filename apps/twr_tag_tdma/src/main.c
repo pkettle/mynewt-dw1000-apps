@@ -89,9 +89,10 @@ static twr_frame_t twr[] = {
 };
 
 
-#define NSLOTS 16
+#define NSLOTS 64
 #if MYNEWT_VAL(TDMA_ENABLED)
-static uint16_t g_slot[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};//,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};//24,25,26,27,28,29,30,31};
+static uint16_t g_slot[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,
+        31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
 #endif
 
 static void timeout_cb(struct _dw1000_dev_instance_t * inst);
@@ -110,31 +111,32 @@ static void error_cb(struct _dw1000_dev_instance_t * inst);
  * returns none 
  */
 static void 
-slot_timer_cb(struct os_event * ev){
-    assert(ev != NULL);
-    assert(ev->ev_arg != NULL);
-    
-    hal_gpio_toggle(LED_BLINK_PIN);
-    dw1000_dev_instance_t * inst = hal_dw1000_inst(0);
+slot_timer_cb(struct os_event *ev){
+    assert(ev);
+
+    tdma_slot_t * slot = (tdma_slot_t *) ev->ev_arg;
+    tdma_instance_t * tdma = slot->parent;
+    dw1000_dev_instance_t * inst = tdma->parent;
     clkcal_instance_t * clk = inst->ccp->clkcal;
-    tdma_instance_t * tdma = inst->tdma;
-    uint16_t slot = *(uint16_t *)ev->ev_arg;
+    uint16_t idx = slot->idx;
+
+    hal_gpio_toggle(LED_BLINK_PIN);
     
 #if MYNEWT_VAL(ADAPTIVE_TIMESCALE_ENABLED) 
-    uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((slot * (uint64_t)tdma->period << 16)/tdma->nslots)));
+    uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((idx * (uint64_t)tdma->period << 16)/tdma->nslots)));
 #else
     uint64_t dx_time = (clk->epoch + (uint64_t) ((slot * ((uint64_t)tdma->period << 16)/tdma->nslots)));
 #endif
-    dx_time = (dx_time + 0xFFFFFFFE00UL + inst->tx_antenna_delay) & 0xFFFFFFFE00UL;
+    dx_time = (dx_time) & 0xFFFFFFFE00UL;
 
-  //  uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-  //  printf("{\"utime\": %lu,\"slot\": %d,\"dx_time\": %llu}\n",utime, slot, dx_time);
+//    uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
+//    printf("{\"utime\": %lu,\"slot\": %d,\"dx_time\": %llu}\n",utime, slot, dx_time);
 
    // uint32_t tic = os_cputime_ticks_to_usecs(os_cputime_get32());
     dw1000_phy_forcetrxoff(inst);
     if(dw1000_rng_request_delay_start(inst, 0x4321, dx_time, DWT_DS_TWR).start_tx_error){
         uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-        printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb:start_tx_error\"}\n",utime);
+        printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb_%d:start_tx_error\"}\n",utime,idx);
     }else{
   //      uint32_t toc = os_cputime_ticks_to_usecs(os_cputime_get32());
   //      printf("{\"utime\": %lu,\"slot_timer_cb_tic_toc\": %lu}\n",toc,toc-tic);
@@ -337,9 +339,6 @@ int main(int argc, char **argv){
     printf("xtal_trim = 0x%X\n",inst->xtal_trim);
 
 #if MYNEWT_VAL(TDMA_ENABLED) 
-    //for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
-    //    g_slot[i] = i; //+1;//2 * i + ALT_SLOT + 1;
-
     tdma_init(inst, MYNEWT_VAL(CCP_PERIOD), NSLOTS); 
     for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
         tdma_assign_slot(inst->tdma, slot_timer_cb, g_slot[i], &g_slot[i]);
@@ -350,7 +349,6 @@ int main(int argc, char **argv){
 
     while (1) {
         os_eventq_run(os_eventq_dflt_get());
-       
     }
     assert(0);
     return rc;

@@ -59,7 +59,7 @@
 #include "json_encode.h"
 
 #define VERBOSE0
-#define NSLOTS 16
+#define NSLOTS 64
 #if MYNEWT_VAL(TDMA_ENABLED)
 static uint16_t g_slot[NSLOTS] = {0};
 #endif
@@ -252,32 +252,33 @@ complete_cb(struct _dw1000_dev_instance_t * inst){
  *
  * returns none 
  */
+
+    
 static void 
 slot_timer_cb(struct os_event * ev){
+    assert(ev);
 
-    dw1000_dev_instance_t * inst = hal_dw1000_inst(0);
+    tdma_slot_t * slot = (tdma_slot_t *) ev->ev_arg;
+    tdma_instance_t * tdma = slot->parent;
+    dw1000_dev_instance_t * inst = tdma->parent;
     clkcal_instance_t * clk = inst->ccp->clkcal;
-    tdma_instance_t * tdma = inst->tdma;
-    uint16_t slot = *(uint16_t *)ev->ev_arg;
+    uint16_t idx = slot->idx;
 
 #if MYNEWT_VAL(ADAPTIVE_TIMESCALE_ENABLED) 
-    uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((slot * (uint64_t)tdma->period << 16)/tdma->nslots)));
+    uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((idx * (uint64_t)tdma->period << 16)/tdma->nslots)));
 #else
     uint64_t dx_time = (clk->epoch + (uint64_t) ((slot * ((uint64_t)tdma->period << 16)/tdma->nslots)));
 #endif
-    dx_time = (dx_time + 0xFFFFFFFE00UL + inst->rx_antenna_delay - (MYNEWT_VAL(DW1000_IDLE_TO_RX_LATENCY) << 16)) & 0xFFFFFFFE00UL;
+    dx_time = (dx_time + 0xFFFFFFFE00UL - (MYNEWT_VAL(DW1000_IDLE_TO_RX_LATENCY) << 16)) & 0xFFFFFFFE00UL;
     
     dw1000_set_delay_start(inst, dx_time);
-    dw1000_set_rx_timeout(inst, rng_config.rx_timeout_period);
-
+    dw1000_set_rx_timeout(inst, 2 * rng_config.rx_timeout_period);
     if(dw1000_start_rx(inst).start_rx_error){
-        uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-        printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb:start_rx_error\"}\n",utime);
     }
 
 #ifdef VERBOSE
     uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-    printf("{\"utime\": %lu,\"slot\": %d,\"dx_time\": %llu}\n",utime, slot, dx_time);
+    printf("{\"utime\": %lu,\"slot\": %d,\"dx_time\": %llu}\n",utime, idx, dx_time);
 #endif
 }
 
@@ -323,13 +324,13 @@ int main(int argc, char **argv){
     dw1000_ccp_init(inst, 2, MYNEWT_VAL(UUID_CCP_MASTER));
 #endif
     
-#if MYNEWT_VAL(TDMA_ENABLED) 
+#if MYNEWT_VAL(TDMA_ENABLED)
     for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
         g_slot[i] = i;
 
     tdma_init(inst, MYNEWT_VAL(CCP_PERIOD), NSLOTS); 
     for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
-        tdma_assign_slot(inst->tdma, slot_timer_cb,  g_slot[i] ,  &g_slot[i]);
+        tdma_assign_slot(inst->tdma, slot_timer_cb,  g_slot[i], &g_slot[i]);
 #else
     dw1000_set_rx_timeout(inst, 0);
     dw1000_start_rx(inst);
