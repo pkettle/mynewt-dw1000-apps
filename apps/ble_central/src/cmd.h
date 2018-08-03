@@ -62,7 +62,7 @@ int cmd_parse_conn_start_end(uint16_t *out_conn, uint16_t *out_start,
 void cmd_init(void);
 
 int call_scan(void);
-int call_connect(ble_addr_t *);
+int call_connect(ble_addr_t * addr);
 int call_set(void);
 int call_disconnect(int conn);
 int call_show_conn(void);

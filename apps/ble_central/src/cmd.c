@@ -679,7 +679,7 @@ cmd_connect(int argc, char **argv)
     uint8_t ext;
     int32_t duration_ms;
     ble_addr_t peer_addr;
-    ble_addr_t *peer_addr_param = &peer_addr; 
+    ble_addr_t *peer_addr_param = &peer_addr;
     int own_addr_type;
     int rc;
 
@@ -1158,7 +1158,6 @@ int call_scan(void)
 {
     char arg1[] = "scan";
     char arg2[] = "duration=70";
-    //ar *argv[2] = {"scan","duration=10"};
     char *argv[2];
     argv[0] = arg1;
     argv[1] = arg2;
@@ -1169,10 +1168,10 @@ int call_scan(void)
 int call_connect(ble_addr_t * addr)
 {
      char arg1[] = "connect";
-//     char arg2[] = {'p','e','e','r','_','a','d','d','r','=','0',':','0',':','0',':','0',':','0',':','0'};
-     char arg2[21];
-     sprintf(arg2,"%s%x%c%x%c%x%c%x%c%x%c%x","peer_addr=",addr->val[5],':',addr->val[4],':',addr->val[3],':',addr->val[2],':',addr->val[1],':',addr->val[0]);
-     printf("--%s---\n",arg2);
+     char arg2[25];
+     sprintf(arg2,"%s%x%c%x%c%x%c%x%c%x%c%x","peer_addr=",addr->val[5],':',addr->val[4],':',addr->val[3],
+                                                      ':',addr->val[2],':',addr->val[1],':',addr->val[0]);
+     printf("[connecting to  %s  ]\n",arg2);
      char *argv[2];
      argv[0] = arg1;
      argv[1] = arg2;
@@ -1191,9 +1190,6 @@ cmd_scan(int argc, char **argv)
     uint16_t duration;
     uint16_t period;
     int rc;
-    //printf("madhu%smadhu\n",argv[0]);
-    //printf("madhu%smadhu\n",argv[1]);
-    //printf("argc = %d\n",argc);
     rc = parse_arg_all(argc - 1, argv + 1);
     if (rc != 0) {
         return rc;

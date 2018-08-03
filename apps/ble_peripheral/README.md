@@ -7,19 +7,27 @@ This project contains BLE based central and peripheral applications which commun
 1.**ble_central** scans for the available devices, connects to the devices based on the device name"DECAWAVE_BLE" and receives notifications (logs)from the peripherals.
 2.**ble_peripheral** continuously sends the logs to the central device after connected with the central device.
 
-**NOTE:** Run ble_central followed by ble_peripheral.
+### Building the Apps
+The following commands are useful get the source code, build and test the above apps.
+```
+git clone https://github.com/Decawave/mynewt-dw1000-apps.git
+newt install -v
+cd mynewt-dw1000-apps
+git checkout ble_logging
+cd repos/apache-mynewt-core
+git checkout 1_4_0_dev
+cd ../repos/apache-mynewt-nimble
+git checkout 1_0_0_dev
+cd ../../
 
+```
 Each ble_central and ble_peripheral apps are built as follows. (executed from the mynewt-dw1000-apps directory).
-
-##To test the applications with newtmgr tool.
-
-Enable UART and disable RTT in ble_cent and ble_prph and change the UART pins in repos/mynewt-dw1000-core/hw/bsp/dwm1001/syscfg.yml
 
 #To create target for ble_cent
 ```
 newt target create ble_cent
 newt target set ble_cent app=apps/ble_central
-newt target set ble_cent bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
+newt target set ble_cent bsp=@apache-mynewt-core/hw/bsp/dwm1001-dev
 newt target set ble_cent build_profile=debug
 ```
 #To build and run ble_cent
@@ -32,7 +40,7 @@ newt load ble_cent
 ```
 newt target create ble_prph
 newt target set ble_prph app=apps/ble_peripheral
-newt target set ble_prph bsp=@mynewt-dw1000-core/hw/bsp/dwm1001 
+newt target set ble_prph bsp=@apache-mynewt-core/hw/bsp/dwm1001-dev
 newt target set ble_prph build_profile=debug
 ```
 #To build and run ble_prph
