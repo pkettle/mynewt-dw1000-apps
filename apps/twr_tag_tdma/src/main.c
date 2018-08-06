@@ -89,10 +89,10 @@ static twr_frame_t twr[] = {
 };
 
 
-#define NSLOTS 64
+#define NSLOTS MYNEWT_VAL(TDMA_NSLOTS)
 #if MYNEWT_VAL(TDMA_ENABLED)
-static uint16_t g_slot[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,
-        31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
+static uint16_t g_slot[NSLOTS] = {0};//{0,1,126,127};//,4,5,6,7,8,9,10,11,12,13,14,15,18,19,20,21,22,23,24,25,26,27,28,29,30,
+       // 31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
 #endif
 
 static void timeout_cb(struct _dw1000_dev_instance_t * inst);
@@ -125,21 +125,17 @@ slot_timer_cb(struct os_event *ev){
 #if MYNEWT_VAL(ADAPTIVE_TIMESCALE_ENABLED) 
     uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((idx * (uint64_t)tdma->period << 16)/tdma->nslots)));
 #else
-    uint64_t dx_time = (clk->epoch + (uint64_t) ((slot * ((uint64_t)tdma->period << 16)/tdma->nslots)));
+    uint64_t dx_time = (clk->epoch + (uint64_t) (idx * ((uint64_t)tdma->period << 16)/tdma->nslots));
 #endif
-    dx_time = (dx_time) & 0xFFFFFFFE00UL;
+    dx_time = dx_time  & 0xFFFFFFFE00UL;
 
-//    uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-//    printf("{\"utime\": %lu,\"slot\": %d,\"dx_time\": %llu}\n",utime, slot, dx_time);
-
-   // uint32_t tic = os_cputime_ticks_to_usecs(os_cputime_get32());
-    dw1000_phy_forcetrxoff(inst);
+//    uint32_t tic = os_cputime_ticks_to_usecs(os_cputime_get32());
     if(dw1000_rng_request_delay_start(inst, 0x4321, dx_time, DWT_DS_TWR).start_tx_error){
         uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
         printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb_%d:start_tx_error\"}\n",utime,idx);
     }else{
-  //      uint32_t toc = os_cputime_ticks_to_usecs(os_cputime_get32());
-  //      printf("{\"utime\": %lu,\"slot_timer_cb_tic_toc\": %lu}\n",toc,toc-tic);
+//        uint32_t toc = os_cputime_ticks_to_usecs(os_cputime_get32());
+//        printf("{\"utime\": %lu,\"slot_timer_cb_tic_toc\": %lu}\n",toc,toc-tic);
     }
 }
 
@@ -181,7 +177,7 @@ slot_complete_cb(struct os_event * ev){
         frame->code = DWT_SS_TWR_END;
     }
 
-    if (frame->code == DWT_DS_TWR_FINAL) {
+    else if (frame->code == DWT_DS_TWR_FINAL) {
         float time_of_flight = dw1000_rng_twr_to_tof(rng);
         float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
         printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
@@ -195,7 +191,8 @@ slot_complete_cb(struct os_event * ev){
         );
         frame->code = DWT_DS_TWR_END;
     } 
-    if (frame->code == DWT_DS_TWR_EXT_FINAL) {
+
+    else if (frame->code == DWT_DS_TWR_EXT_FINAL) {
         float time_of_flight = dw1000_rng_twr_to_tof(rng);
         printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
                 " \"rec_tra\": \"%lX\"}\n",
@@ -287,7 +284,7 @@ complete_cb(struct _dw1000_dev_instance_t * inst){
     
     os_callout_init(&slot_complete_callout, os_eventq_dflt_get(), slot_complete_cb, inst);
     os_eventq_put(os_eventq_dflt_get(), &slot_complete_callout.c_ev);
-
+    
     if (inst->tdma->status.awaiting_superframe){
             uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
             printf("{\"utime\": %lu,\"complete_cb\":\"awaiting_superframe\"}\n",utime); 
@@ -295,7 +292,6 @@ complete_cb(struct _dw1000_dev_instance_t * inst){
             dw1000_start_rx(inst); 
     }
 }
-
 
 
 #define ALT_SLOT 0
@@ -336,10 +332,12 @@ int main(int argc, char **argv){
     printf("DeviceID = 0x%X\n",inst->my_short_address);
     printf("partID = 0x%lX\n",inst->partID);
     printf("lotID = 0x%lX\n",inst->lotID);
-    printf("xtal_trim = 0x%X\n",inst->xtal_trim);
+    printf("xtal_trim = 0x%X\n",inst->xtal_trim);    
 
 #if MYNEWT_VAL(TDMA_ENABLED) 
-    tdma_init(inst, MYNEWT_VAL(CCP_PERIOD), NSLOTS); 
+   for (uint16_t i = 0; i < sizeof(g_slot)/sizeof(uint16_t); i++)
+        g_slot[i] = i;
+    tdma_init(inst, MYNEWT_VAL(TDMA_SUPERFRAME_PERIOD), NSLOTS); 
     for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
         tdma_assign_slot(inst->tdma, slot_timer_cb, g_slot[i], &g_slot[i]);
 #else

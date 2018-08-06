@@ -59,7 +59,7 @@
 #include "json_encode.h"
 
 #define VERBOSE0
-#define NSLOTS 64
+#define NSLOTS MYNEWT_VAL(TDMA_NSLOTS)
 #if MYNEWT_VAL(TDMA_ENABLED)
 static uint16_t g_slot[NSLOTS] = {0};
 #endif
@@ -131,10 +131,10 @@ static void slot_ev_cb(struct os_event *ev)
         frame->code = DWT_DS_TWR_END;
     }    
     else if (frame->code == DWT_SS_TWR_FINAL) {
-        uint32_t time_of_flight = (uint32_t) dw1000_rng_twr_to_tof(rng);
-        uint32_t utime =os_cputime_ticks_to_usecs(os_cputime_get32()); 
+        float time_of_flight = dw1000_rng_twr_to_tof(rng);
         float range = dw1000_rng_tof_to_meters(time_of_flight);
-
+        uint32_t utime =os_cputime_ticks_to_usecs(os_cputime_get32()); 
+ 
         printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_tra\":\"%lX\","
                     " \"rec_tra\":\"%lX\"}\n",
                 utime,
@@ -267,12 +267,12 @@ slot_timer_cb(struct os_event * ev){
 #if MYNEWT_VAL(ADAPTIVE_TIMESCALE_ENABLED) 
     uint64_t dx_time = (clk->epoch + (uint64_t) roundf(clk->skew * (double)((idx * (uint64_t)tdma->period << 16)/tdma->nslots)));
 #else
-    uint64_t dx_time = (clk->epoch + (uint64_t) ((slot * ((uint64_t)tdma->period << 16)/tdma->nslots)));
+    uint64_t dx_time = (clk->epoch + (uint64_t) ((idx * ((uint64_t)tdma->period << 16)/tdma->nslots)));
 #endif
-    dx_time = (dx_time + 0xFFFFFFFE00UL - (MYNEWT_VAL(DW1000_IDLE_TO_RX_LATENCY) << 16)) & 0xFFFFFFFE00UL;
+    dx_time = (dx_time - (MYNEWT_VAL(DW1000_IDLE_TO_RX_LATENCY) << 16)) & 0xFFFFFFFE00UL;
     
     dw1000_set_delay_start(inst, dx_time);
-    dw1000_set_rx_timeout(inst, 2 * rng_config.rx_timeout_period);
+    dw1000_set_rx_timeout(inst, rng_config.rx_timeout_period);
     if(dw1000_start_rx(inst).start_rx_error){
     }
 
@@ -325,10 +325,10 @@ int main(int argc, char **argv){
 #endif
     
 #if MYNEWT_VAL(TDMA_ENABLED)
-    for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
+    for (uint16_t i = 0; i < sizeof(g_slot)/sizeof(uint16_t); i++)
         g_slot[i] = i;
 
-    tdma_init(inst, MYNEWT_VAL(CCP_PERIOD), NSLOTS); 
+    tdma_init(inst, MYNEWT_VAL(TDMA_SUPERFRAME_PERIOD), NSLOTS); 
     for (uint16_t i = 1; i < sizeof(g_slot)/sizeof(uint16_t); i++)
         tdma_assign_slot(inst->tdma, slot_timer_cb,  g_slot[i], &g_slot[i]);
 #else
