@@ -134,6 +134,14 @@ int btshell_full_disc_prev_chr_val;
 #define BTSHELL_AUTO_DEVICE_NAME    ""
 #endif
 
+int call_connect(ble_addr_t * addr);
+int call_scan(void);
+int call_set(void);
+static int g_decawave_node = 0;
+static int g_no_of_nodes = 0;
+ble_addr_t g_deca_dev_addr[10];
+static struct os_callout g_ble_callout;
+
 static void
 btshell_print_error(char *msg, uint16_t conn_handle,
                     const struct ble_gatt_error *error)
@@ -899,17 +907,6 @@ btshell_on_write_reliable(uint16_t conn_handle,
 
     return 0;
 }
-int call_connect(ble_addr_t *);
-int call_scan(void);
-int call_set(void);
-int global_flag = 0;
-int decawave = 0;
-int no_of_nodes = 0;
-ble_addr_t global_addr[10];
-int do_scan = 1;
-int discovery_complete = 0;
-int connection_established = 0;
-static struct os_callout blinky_callout;
 
 static void
 btshell_decode_adv_data(uint8_t *adv_data, uint8_t adv_data_len, void *arg)
@@ -929,13 +926,12 @@ btshell_decode_adv_data(uint8_t *adv_data, uint8_t adv_data_len, void *arg)
     btshell_print_adv_fields(&fields);
     console_printf("\n");
     if(strncmp((const char *)fields.name,"DECAWAVE",8) == 0)
-    {    
-        global_flag= 1;
-        no_of_nodes++;
-        decawave = 1;
+    {
+        g_no_of_nodes++;
+        g_decawave_node = 1;
     }
-    else 
-    decawave = 0;
+    else
+        g_decawave_node = 0;
 }
 
 #if MYNEWT_VAL(BLE_EXT_ADV)
@@ -1027,7 +1023,6 @@ btshell_gap_event(struct ble_gap_event *event, void *arg)
             assert(rc == 0);
             print_conn_desc(&desc);
             btshell_conn_add(&desc);
-            connection_established = 1;
         }
         return 0;
 
@@ -1060,8 +1055,8 @@ btshell_gap_event(struct ble_gap_event *event, void *arg)
         }
 
         btshell_decode_adv_data(event->disc.data, event->disc.length_data, arg);
-        if(global_flag == 1 && decawave == 1)
-           memcpy(&global_addr[no_of_nodes],&event->disc.addr,sizeof(ble_addr_t));
+        if(g_decawave_node == 1)
+           memcpy(&g_deca_dev_addr[g_no_of_nodes],&event->disc.addr,sizeof(ble_addr_t));
 
         return 0;
 
@@ -1091,10 +1086,8 @@ btshell_gap_event(struct ble_gap_event *event, void *arg)
 
 
     case BLE_GAP_EVENT_DISC_COMPLETE:
-        console_printf("discovery complete; reason=%d\n",
+        console_printf("discovery complete; reason=%d \n\n",
                        event->disc_complete.reason);
-         discovery_complete = 1;
-         do_scan = 1;
         return 0;
 
     case BLE_GAP_EVENT_ADV_COMPLETE:
@@ -2056,41 +2049,20 @@ btshell_l2cap_send(uint16_t conn_handle, uint16_t idx, uint16_t bytes)
 
 #endif
 }
-static void timer_ev_cb(struct os_event *ev) {
-    //btshell_scan(own_addr_type, duration_ms, &params, &g_scan_opts);       
-    if(global_flag == 1 && discovery_complete == 1 && connection_established == 0)
-    {   
-        call_connect(&global_addr[no_of_nodes--]);                    
-        os_time_delay(128);
-    }
-     if(connection_established == 1)
-    {
-        //int rc;
-        //uint32_t conn = call_show_conn();
-        //rc = call_disconnect(conn);
-        //printf("disconn==rc ==%d\n",rc);
-        //while(rc!=0)
-        //{
-        //    rc = call_disconnect(++conn);
-        //}
-        connection_established = 0;
-        if(no_of_nodes == 0) 
-        {
-            do_scan = 1;
-            discovery_complete = 0;
-            global_flag = 0;
-        }
-       // os_callout_reset(&blinky_callout, 1);
-       // return;
-    }
-    if(do_scan && connection_established != 1)
-    {    
-        call_scan();        
-        do_scan = 0;
-    }
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC * 3);
-}
 
+static void timer_ev_cb(struct os_event *ev) {
+    if(g_no_of_nodes > 0)
+    {
+       call_connect(&g_deca_dev_addr[g_no_of_nodes--]);
+       os_callout_reset(&g_ble_callout, OS_TICKS_PER_SEC * 1);
+       return;
+    }
+    else
+    {
+        call_scan();
+    }
+    os_callout_reset(&g_ble_callout, OS_TICKS_PER_SEC * 3);
+}
 
 /**
  * main
@@ -2172,8 +2144,8 @@ main(int argc, char **argv)
      */
     os_callout_init(&btshell_tx_timer, os_eventq_dflt_get(),
                     btshell_tx_timer_cb, NULL);
-    os_callout_init(&blinky_callout, os_eventq_dflt_get(), timer_ev_cb, NULL);
-    os_callout_reset(&blinky_callout, OS_TICKS_PER_SEC * 3);
+    os_callout_init(&g_ble_callout, os_eventq_dflt_get(), timer_ev_cb, NULL);
+    os_callout_reset(&g_ble_callout, OS_TICKS_PER_SEC * 3);
 
     while (1) {
         os_eventq_run(os_eventq_dflt_get());

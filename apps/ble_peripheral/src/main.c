@@ -210,7 +210,7 @@ static void timer_ev_cb(struct os_event *ev) {
     char str[25] ; 
     sprintf(str,"%d %s %d",MYNEWT_VAL_BLE_DEVICE_ID,"Hello",count++);
     bleuart_write((void const*)str, sizeof(str));
-    os_callout_reset(&ble_callout, OS_TICKS_PER_SEC * 1);
+    os_callout_reset(&ble_callout, OS_TICKS_PER_SEC /2);
 }
 
 /**
