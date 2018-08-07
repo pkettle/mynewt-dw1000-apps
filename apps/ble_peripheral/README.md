@@ -27,7 +27,7 @@ Each ble_central and ble_peripheral apps are built as follows. (executed from th
 ```
 newt target create ble_cent
 newt target set ble_cent app=apps/ble_central
-newt target set ble_cent bsp=@apache-mynewt-core/hw/bsp/dwm1001-dev
+newt target set ble_cent bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set ble_cent build_profile=debug
 ```
 #To build and run ble_cent
@@ -40,7 +40,7 @@ newt load ble_cent
 ```
 newt target create ble_prph
 newt target set ble_prph app=apps/ble_peripheral
-newt target set ble_prph bsp=@apache-mynewt-core/hw/bsp/dwm1001-dev
+newt target set ble_prph bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
 newt target set ble_prph build_profile=debug
 ```
 #To build and run ble_prph
