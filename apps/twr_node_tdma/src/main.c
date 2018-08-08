@@ -160,7 +160,14 @@ static void slot_ev_cb(struct os_event *ev)
  */
 static void 
 timeout_cb(dw1000_dev_instance_t * inst) {
-  
+    if(inst->fctrl != FCNTL_IEEE_RANGE_16){
+        if(inst->extension_cb->next != NULL){
+            inst->extension_cb = inst->extension_cb->next;
+            if(inst->extension_cb->rx_timeout_cb != NULL)
+                inst->extension_cb->rx_timeout_cb(inst);
+        }
+        return;
+    } 
   uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
 #ifdef VERBOSE
     if (inst->status.rx_timeout_error){
@@ -189,7 +196,19 @@ timeout_cb(dw1000_dev_instance_t * inst) {
  */
 static void 
 error_cb(struct _dw1000_dev_instance_t * inst) {
-
+    if(inst->fctrl != FCNTL_IEEE_RANGE_16){
+        if(inst->extension_cb->next != NULL){
+            inst->extension_cb = inst->extension_cb->next;
+            if(inst->status.rx_error == 1){
+                if(inst->extension_cb->rx_error_cb != NULL)
+                    inst->extension_cb->rx_error_cb(inst);
+            }else if(inst->status.start_tx_error == 1){
+                if(inst->extension_cb->tx_error_cb != NULL)
+                    inst->extension_cb->tx_error_cb(inst);
+            }
+        }
+        return;
+    }
 #ifdef VERBOSE
     uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
     if (inst->status.start_rx_error)
@@ -206,6 +225,17 @@ error_cb(struct _dw1000_dev_instance_t * inst) {
             printf("{\"utime\": %lu,\"msg\":\"error_cb::awaiting_superframe\"}\n",utime);
             dw1000_set_rx_timeout(inst, 0);
             dw1000_start_rx(inst); 
+    }
+}
+
+static void
+tx_complete_cb(dw1000_dev_instance_t* inst){
+    if(inst->fctrl != FCNTL_IEEE_RANGE_16){
+        if(inst->extension_cb->next != NULL){
+            inst->extension_cb = inst->extension_cb->next;
+            if(inst->extension_cb->tx_complete_cb != NULL)
+                inst->extension_cb->tx_complete_cb(inst);
+        }
     }
 }
 
@@ -227,7 +257,18 @@ static struct os_callout slot_callout;
 
 static void 
 complete_cb(struct _dw1000_dev_instance_t * inst){
-
+    if(inst->fctrl != FCNTL_IEEE_RANGE_16){
+        if(inst->extension_cb->next != NULL){
+            inst->extension_cb = inst->extension_cb->next;
+            if(inst->extension_cb->rx_complete_cb != NULL)
+                inst->extension_cb->rx_complete_cb(inst);
+        }else{
+            dw1000_dev_control_t control = inst->control_rx_context;
+            inst->control = inst->control_rx_context;
+            dw1000_restart_rx(inst, control);
+        }
+        return;
+    }
     if (inst->tdma->status.awaiting_superframe){
             uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
             printf("{\"utime\": %lu,\"complete_cb\":\"awaiting_superframe\"}\n",utime); 
@@ -285,6 +326,7 @@ slot_timer_cb(struct os_event * ev){
 
 int main(int argc, char **argv){
     int rc;
+    dw1000_extension_callbacks_t tdma_cbs;
     
     sysinit();
     hal_gpio_init_out(LED_BLINK_PIN, 1);
@@ -302,10 +344,6 @@ int main(int argc, char **argv){
     dw1000_mac_init(inst, NULL);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
-    dw1000_rng_set_error_extension_cb(inst, error_cb);
-    dw1000_rng_set_rx_timeout_extension_cb(inst, timeout_cb);
-    dw1000_rng_set_complete_cb(inst, complete_cb);
-
 #if MYNEWT_VAL(DW1000_PAN)
         dw1000_pan_init(inst, &pan_config);   
         dw1000_pan_start(inst, DWT_NONBLOCKING); 
@@ -319,6 +357,14 @@ int main(int argc, char **argv){
     printf("partID = 0x%lX\n",inst->partID);
     printf("lotID = 0x%lX\n",inst->lotID);
     printf("xtal_trim = 0x%X\n",inst->xtal_trim);
+
+    tdma_cbs.tx_error_cb = error_cb;
+    tdma_cbs.rx_error_cb = error_cb;
+    tdma_cbs.rx_timeout_cb = timeout_cb;
+    tdma_cbs.rx_complete_cb = complete_cb;
+    tdma_cbs.tx_complete_cb = tx_complete_cb;
+    tdma_cbs.id = DW1000_RANGE;
+    dw1000_add_extension_callbacks(inst, tdma_cbs);
 
 #if MYNEWT_VAL(DW1000_CCP_ENABLED)
     dw1000_ccp_init(inst, 2, MYNEWT_VAL(UUID_CCP_MASTER));
