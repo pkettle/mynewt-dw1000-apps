@@ -55,26 +55,14 @@
  *
  * returns none
  */
-void
+bool
 pan_rx_complete_cb(dw1000_dev_instance_t * inst){
      if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_complete_cb != NULL)
-                inst->extension_cb->rx_complete_cb(inst);
-        //For the range service the fctrl is same as FCNTL_IEEE_RANGE_16
-        //In he range case the decision is always taken by application
-        //So put it back to receive only if the intended packet doesn't match
-        //any of the reserved or range packet
-        }else if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-            dw1000_dev_control_t control = inst->control_rx_context;
-            dw1000_restart_rx(inst, control);
-        }
-        return;
+        return false;
     }else if(inst->pan->status.valid == true){
         dw1000_dev_control_t control = inst->control_rx_context;
         dw1000_restart_rx(inst, control);
-        return;
+        return true;
     }
     dw1000_pan_instance_t * pan = inst->pan;
     pan_frame_t * frame = pan->frames[(pan->idx)%pan->nframes];
@@ -95,6 +83,7 @@ pan_rx_complete_cb(dw1000_dev_instance_t * inst){
     // both pan_master and TAG/ANCHOR
     if (pan->control.postprocess)
         os_eventq_put(os_eventq_dflt_get(), &pan->pan_callout_postprocess.c_ev);
+    return true;
 }
 
 /*! 
@@ -109,19 +98,15 @@ pan_rx_complete_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_tx_complete_cb(dw1000_dev_instance_t * inst){
-   if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_complete_cb != NULL)
-                inst->extension_cb->tx_complete_cb(inst);
-        }
-    return;
-   }
-   dw1000_pan_instance_t * pan = inst->pan;
-   os_sem_release(&inst->pan->sem);
-   pan->idx++;
+    if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
+        return false;
+    }
+    dw1000_pan_instance_t * pan = inst->pan;
+    os_sem_release(&inst->pan->sem);
+    pan->idx++;
+    return true;
 }
 
 /*!
@@ -138,17 +123,13 @@ pan_tx_complete_cb(dw1000_dev_instance_t * inst){
  * returns none
  */
 
-void
+bool
 pan_tx_error_cb(dw1000_dev_instance_t * inst){
     /* Place holder */
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_error_cb != NULL)
-                inst->extension_cb->tx_error_cb(inst);
-        }
-        return;
+        return false;
     }
+    return true;
 }
 
 /*!
@@ -164,18 +145,14 @@ pan_tx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_rx_error_cb(dw1000_dev_instance_t * inst){
     /* Place holder */
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_error_cb != NULL)
-                inst->extension_cb->rx_error_cb(inst);
-        }
-        return;
+        return false;
     }
     os_sem_release(&inst->pan->sem);
+    return true;
 }
 
 /*! 
@@ -190,21 +167,17 @@ pan_rx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_rx_timeout_cb(dw1000_dev_instance_t * inst){
     //printf("pan_rx_timeout_cb\n");  
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_timeout_cb != NULL)
-                inst->extension_cb->rx_timeout_cb(inst);
-        }
-        return;
+        return false;
     }
     dw1000_pan_instance_t * pan = inst->pan;
     if (pan->control.postprocess){
         os_eventq_put(os_eventq_dflt_get(), &pan->pan_callout_postprocess.c_ev);
     }
+    return true;
 }
 
 /*! 
@@ -222,23 +195,11 @@ pan_rx_timeout_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 provision_rx_complete_cb(dw1000_dev_instance_t* inst){
     assert(inst != NULL);
     if(inst->fctrl != FCNTL_IEEE_PROVISION_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            inst->extension_cb->rx_complete_cb(inst);
-        }
-        //For the range service the fctrl is same as FCNTL_IEEE_RANGE_16
-        //In he range case the decision is always taken by application
-        //So put it back to receive only if the intended packet doesn't match
-        //any of the reserved or range packet
-        else if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-            dw1000_dev_control_t control = inst->control_rx_context;
-            dw1000_restart_rx(inst, control);
-        }
-        return;
+        return false;
     }
     assert(inst->provision != NULL);
     uint16_t  frame_idx = inst->provision->idx;
@@ -246,25 +207,21 @@ provision_rx_complete_cb(dw1000_dev_instance_t* inst){
     dw1000_provision_instance_t * provision = inst->provision;
     dw1000_provision_config_t config = provision->config;
 
-    if (inst->fctrl == FCNTL_IEEE_PROVISION_16){
-        dw1000_read_rx(inst, (uint8_t *) &code, offsetof(ieee_rng_request_frame_t,code), sizeof(uint16_t));
-        dw1000_read_rx(inst, (uint8_t *) &dst_address, offsetof(ieee_rng_request_frame_t,dst_address), sizeof(uint16_t));
-    }else{
-        return;
-    }
+    dw1000_read_rx(inst, (uint8_t *) &code, offsetof(ieee_rng_request_frame_t,code), sizeof(uint16_t));
+    dw1000_read_rx(inst, (uint8_t *) &dst_address, offsetof(ieee_rng_request_frame_t,dst_address), sizeof(uint16_t));
     if ((dst_address != inst->my_short_address) && (dst_address != (uint16_t)0xFFFF)){
         if (dw1000_restart_rx(inst, inst->control).start_rx_error)
             inst->rng_rx_error_cb(inst);
-        return;
+        return true;
     }
     provision_frame_t * frame = &provision->frames[(frame_idx)%provision->nframes];
     switch(code)
     {
         case DWT_PROVISION_START:
             {
-                    if (dw1000_restart_rx(inst, inst->control).start_rx_error)
-                        inst->rng_rx_error_cb(inst);
-                    break;
+                if (dw1000_restart_rx(inst, inst->control).start_rx_error)
+                    inst->rng_rx_error_cb(inst);
+                break;
             }
         case DWT_PROVISION_RESP:
             {
@@ -285,7 +242,8 @@ provision_rx_complete_cb(dw1000_dev_instance_t* inst){
                     }
                     break;
                 }
-                if (dw1000_restart_rx(inst, inst->control).start_rx_error)
+                dw1000_dev_control_t control = inst->control_rx_context;
+                if (dw1000_restart_rx(inst, control).start_rx_error)
                     inst->rng_rx_error_cb(inst);
                 break;
             }
@@ -318,6 +276,7 @@ provision_rx_complete_cb(dw1000_dev_instance_t* inst){
 
             printf("Wrong request \n");
     }
+    return true;
 }
 
 /*! 
@@ -332,21 +291,17 @@ provision_rx_complete_cb(dw1000_dev_instance_t* inst){
  *
  * returns none
  */
-void
+bool
 provision_rx_timeout_cb(dw1000_dev_instance_t * inst){
     assert(inst != NULL);
 
     if(inst->fctrl != FCNTL_IEEE_PROVISION_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_timeout_cb != NULL)
-                inst->extension_cb->rx_timeout_cb(inst);
-        }
-		return;
+		return false;
     }
     assert(inst->provision != NULL);
     dw1000_provision_instance_t *provision = inst->provision;
     if(provision->status.provision_status == PROVISION_START){
+        printf("Finish \n");
         os_error_t err = os_sem_release(&provision->sem);
         assert(err == OS_OK);
 		provision->status.provision_status = PROVISION_DONE;
@@ -357,6 +312,7 @@ provision_rx_timeout_cb(dw1000_dev_instance_t * inst){
         inst->control = inst->control_rx_context;
         dw1000_start_rx(inst);
     }
+    return true;
 }
 
 /*! 
@@ -371,16 +327,11 @@ provision_rx_timeout_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 provision_rx_error_cb(dw1000_dev_instance_t * inst){
     assert(inst != NULL);
     if(inst->fctrl != FCNTL_IEEE_PROVISION_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_error_cb != NULL)
-                inst->extension_cb->rx_error_cb(inst);
-        }
-     	return;
+     	return false;
     }
     assert(inst->provision != NULL);
     if(inst->provision->status.provision_status == PROVISION_START){
@@ -391,6 +342,7 @@ provision_rx_error_cb(dw1000_dev_instance_t * inst){
         inst->control = inst->control_rx_context;
         dw1000_start_rx(inst);
     }
+    return true;
 }
 
 /*! 
@@ -405,16 +357,13 @@ provision_rx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 provision_tx_error_cb(dw1000_dev_instance_t * inst){
     assert(inst != NULL);
     if(inst->fctrl != FCNTL_IEEE_PROVISION_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_error_cb != NULL)
-                inst->extension_cb->tx_error_cb(inst);
-        }
+        return false;
     }
+    return true;
 }
 
 /*! 
@@ -429,14 +378,11 @@ provision_tx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 provision_tx_complete_cb(dw1000_dev_instance_t * inst){
     //Place holder
 	if(inst->fctrl != FCNTL_IEEE_PROVISION_16){
-		if(inst->extension_cb->next != NULL){
-        	inst->extension_cb = inst->extension_cb->next;
-        	if(inst->extension_cb->tx_complete_cb != NULL)
-           		inst->extension_cb->tx_complete_cb(inst);
-		}
+        return false;
 	}
+    return true;
 }

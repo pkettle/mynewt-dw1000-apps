@@ -34,17 +34,17 @@ extern "C" {
 
 #include <dw1000/dw1000_dev.h>
 
-void pan_rx_complete_cb(dw1000_dev_instance_t * inst);
-void pan_tx_complete_cb(dw1000_dev_instance_t * inst);
-void pan_rx_timeout_cb(dw1000_dev_instance_t * inst);
-void pan_rx_error_cb(dw1000_dev_instance_t * inst);
-void pan_tx_error_cb(dw1000_dev_instance_t * inst);
+bool pan_rx_complete_cb(dw1000_dev_instance_t * inst);
+bool pan_tx_complete_cb(dw1000_dev_instance_t * inst);
+bool pan_rx_timeout_cb(dw1000_dev_instance_t * inst);
+bool pan_rx_error_cb(dw1000_dev_instance_t * inst);
+bool pan_tx_error_cb(dw1000_dev_instance_t * inst);
 
-void provision_rx_complete_cb(dw1000_dev_instance_t * inst);
-void provision_tx_complete_cb(dw1000_dev_instance_t * inst);
-void provision_rx_timeout_cb(dw1000_dev_instance_t * inst);
-void provision_rx_error_cb(dw1000_dev_instance_t * inst);
-void provision_tx_error_cb(dw1000_dev_instance_t * inst);
+bool provision_rx_complete_cb(dw1000_dev_instance_t * inst);
+bool provision_tx_complete_cb(dw1000_dev_instance_t * inst);
+bool provision_rx_timeout_cb(dw1000_dev_instance_t * inst);
+bool provision_rx_error_cb(dw1000_dev_instance_t * inst);
+bool provision_tx_error_cb(dw1000_dev_instance_t * inst);
 
 #ifdef __cplusplus
 }
