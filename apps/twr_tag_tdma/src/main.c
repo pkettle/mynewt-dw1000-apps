@@ -177,19 +177,68 @@ slot_timer_cb(struct os_event *ev){
 					printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb_%d:start_tx_error\"}\n",utime,idx);
 				}
 			}else if(dw1000_rng_request(inst, g_node_addr[i], DWT_DS_TWR).start_tx_error){
-					uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
-					printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb_%d:start_tx_error\"}\n",utime,idx);
+				uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
+				printf("{\"utime\": %lu,\"msg\": \"slot_timer_cb_%d:start_tx_error\"}\n",utime,idx);
 			}
+			dw1000_rng_instance_t * rng = inst->rng;
+			twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
+
+			if (frame->code == DWT_SS_TWR_FINAL) {
+				float time_of_flight = (float) dw1000_rng_twr_to_tof(rng);
+				float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
+				printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_req\": \"%lX\","
+						" \"rec_tra\": \"%lX\"}\n",
+						os_cputime_ticks_to_usecs(os_cputime_get32()),
+						*(uint32_t *)(&time_of_flight), 
+						*(uint32_t *)(&range),
+						(frame->response_timestamp - frame->request_timestamp),
+						(frame->transmission_timestamp - frame->reception_timestamp)
+				      );
+				frame->code = DWT_SS_TWR_END;
+			}
+
+			else if (frame->code == DWT_DS_TWR_FINAL) {
+				float time_of_flight = dw1000_rng_twr_to_tof(rng);
+				float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
+				printf("{\"utime\": %lu,\"dst addr\": %04x,\"src addr\": %04x,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
+						" \"rec_tra\": \"%lX\"}\n",
+						os_cputime_ticks_to_usecs(os_cputime_get32()), 
+						(frame->dst_address),
+						(frame->src_address),
+						*(uint32_t *)(&time_of_flight), 
+						*(uint32_t *)(&range),
+						*(uint32_t *)(&frame->spherical.azimuth),
+						(frame->response_timestamp - frame->request_timestamp),
+						(frame->transmission_timestamp - frame->reception_timestamp)
+				      );
+				frame->code = DWT_DS_TWR_END;
+			} 
+
+			else if (frame->code == DWT_DS_TWR_EXT_FINAL) {
+				float time_of_flight = dw1000_rng_twr_to_tof(rng);
+				printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
+						" \"rec_tra\": \"%lX\"}\n",
+						os_cputime_ticks_to_usecs(os_cputime_get32()), 
+						*(uint32_t *)(&time_of_flight), 
+						*(uint32_t *)(&frame->spherical.range),
+						*(uint32_t *)(&frame->spherical.azimuth),
+						(frame->response_timestamp - frame->request_timestamp),
+						(frame->transmission_timestamp - frame->reception_timestamp)
+				      );
+				frame->code = DWT_DS_TWR_END;
+			}
+
 
 		}
 		dw1000_mac_framefilter(inst,DWT_FF_DATA_EN|DWT_FF_RSVD_EN);
-                g_event = DW1000_PROVISION_STATE;
+		g_event = DW1000_PROVISION_STATE;
 	}else if(g_event == DW1000_PROVISION_STATE){
 		dw1000_provision_start(inst);
 	}
 	event_update(inst);
 }
 
+#if 0
 /*! 
  * @fn frame_complete_cb(struct os_event * ev)
  *
@@ -257,6 +306,7 @@ slot_complete_cb(struct os_event * ev){
         frame->code = DWT_DS_TWR_END;
     }
 }
+#endif
 
 /*! 
  * @fn timeout_cb(struct os_event *ev)
@@ -345,15 +395,15 @@ tx_complete_cb(dw1000_dev_instance_t* inst){
  * returns none 
  */
 /* The timer callout */
-static struct os_callout slot_complete_callout;
+//static struct os_callout slot_complete_callout;
 
 static bool 
 complete_cb(struct _dw1000_dev_instance_t * inst){
     if(inst->fctrl != FCNTL_IEEE_RANGE_16){
         return false;
     }
-    os_callout_init(&slot_complete_callout, os_eventq_dflt_get(), slot_complete_cb, inst);
-    os_eventq_put(os_eventq_dflt_get(), &slot_complete_callout.c_ev);
+    //os_callout_init(&slot_complete_callout, os_eventq_dflt_get(), slot_complete_cb, inst);
+    //os_eventq_put(os_eventq_dflt_get(), &slot_complete_callout.c_ev);
     
     if (inst->tdma->status.awaiting_superframe){
             uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
