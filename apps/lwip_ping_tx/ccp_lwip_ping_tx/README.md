@@ -19,13 +19,11 @@
 #
 -->
 
-# Decawave DW1000 Application lwip_p2p_tx.
+# Decawave DW1000 Application ccp_lwip_ping_tx
 
 ## Overview
-The Decawave DW1000 Application lwip_p2p_tx showcases the ability of lwIP P2P service to send and receive user defined payloads to and from a node via lwip_p2p service. In this sample application, we are sending a string from Node A to other node.
-
-To control the Tx with CCP packets, change "DW1000_CCP_ENABLED" in syscfg.yml to 1.
-After DW1000_CCP_ENABLED is set to 1, the ping packet is transmitted only when a CCP packet is received (use clock_master app for sending CCP packet).
+The Decawave DW1000 Application ccp_lwip_ping_tx showcases the ability of lwIP driver to send and receive 
+payloads to and from a node. In this sample application, we are sending a ping from Node A to NODE B.
 
 ## Pre-Requisites
 Repo 	:	mynewt-dw1000-apps
@@ -39,26 +37,25 @@ Branch	:	master
 Tag 	:	1.3.0
 
 ## Building
-1. Build the lwip_p2p_tx app.
+1. Build and flash the ccp_lwip_ping_tx app.
 
 ```no-highlight
-
-newt target create lwip_p2p_tx
-newt target set lwip_p2p_tx app=apps/lwip_p2p_tx
-newt target set lwip_p2p_tx bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
-newt target set lwip_p2p_tx build_profile=debug
-newt build lwip_p2p_tx
-newt create-image lwip_p2p_tx 1.0.0
-newt load lwip_p2p_tx
+newt target create ccp_lwip_ping_tx
+newt target set ccp_lwip_ping_tx app=apps/ccp_lwip_ping_tx
+newt target set ccp_lwip_ping_tx bsp=@mynewt-dw1000-core/hw/bsp/dwm1001
+newt target set ccp_lwip_ping_tx build_profile=debug
+newt build ccp_lwip_ping_tx
+newt create-image ccp_lwip_ping_tx 1.0.0
+newt load ccp_lwip_ping_tx
 ```
 
 ## Testing
-1. Flash lwip_p2p_tx into Node A.
-2. Build and flash lwip_p2p_rx in Node B.
+1. Flash ccp_lwip_ping_tx into Node A.
+2. Build and flash lwip_ping_rx in Node B.
 3. Connect both the nodes to Dev PC and monitor the logs of the nodes in serial comm application.
 4. The expected output is as shown below,
 	On Node A:
 
 ```no-highlight
- Payload: Hello!
+Seq Num : <NUM>
 ```

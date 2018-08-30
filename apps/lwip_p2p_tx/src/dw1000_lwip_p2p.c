@@ -61,14 +61,16 @@ lwip_p2p_timer_ev_cb(struct os_event *ev) {
 
     inst->lwip->dst_addr = lwip_p2p->payload_info[idx]->node_addr;
     dw1000_lwip_p2p_send(inst, idx);
+#if !MYNEWT_VAL(DW1000_CCP_ENABLED)
     os_callout_reset(&lwip_p2p_callout_timer, OS_TICKS_PER_SEC/8);
+#endif
 }
 
 static void
 lwip_p2p_timer_init(dw1000_dev_instance_t *inst) {
 
     os_callout_init(&lwip_p2p_callout_timer, os_eventq_dflt_get(), lwip_p2p_timer_ev_cb, (void *) inst);
-    os_callout_reset(&lwip_p2p_callout_timer, OS_TICKS_PER_SEC/4);
+    os_callout_reset(&lwip_p2p_callout_timer, OS_TICKS_PER_SEC/2);
     dw1000_lwip_p2p_instance_t * lwip_p2p = inst->lwip->lwip_p2p;
     lwip_p2p->status.timer_enabled = true;
 }

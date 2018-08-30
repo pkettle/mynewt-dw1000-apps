@@ -25,6 +25,9 @@
 The Decawave DW1000 Application lwip_ping_tx showcases the ability of lwIP driver to send and receive 
 payloads to and from a node. In this sample application, we are sending a ping from Node A to NODE B.
 
+To control the Tx with CCP packets, change "DW1000_CCP_ENABLED" in syscfg.yml to 1.
+After DW1000_CCP_ENABLED is set to 1, the ping packet is transmitted only when a CCP packet is received (use clock_master app for sending CCP packet).
+
 ## Pre-Requisites
 Repo 	:	mynewt-dw1000-apps
 Branch	:	master

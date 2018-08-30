@@ -38,7 +38,7 @@
 #include <dw1000/dw1000_rng.h>
 #include <dw1000/dw1000_ftypes.h>
 
-#if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)
+#if MYNEWT_VAL(DW1000_CCP_ENABLED)
 #include <dw1000/dw1000_ccp.h>
 #endif
 
@@ -53,6 +53,26 @@ struct dw1000_lwip_p2p_instance_t *lwip_p2p;
 
 #define FRAME_LEN   MYNEWT_VAL(PAYLOAD_STRING_LEN)
 #define RX_STATUS false
+
+#if MYNEWT_VAL(DW1000_CCP_ENABLED)
+static dw1000_rng_config_t rng_config = {
+    .tx_holdoff_delay = 0x0C00,         // Send Time delay in usec.
+    .rx_timeout_period = 0x0800         // Receive response timeout in usec.
+};
+
+static twr_frame_t twr[] = {
+    [0] = {
+        .fctrl = 0x8841,                // frame control (0x8841 to indicate a data frame using 16-bit addressing).
+        .PANID = 0xDECA,                 // PAN ID (0xDECA)
+        .code = DWT_TWR_INVALID
+    },
+    [1] = {
+        .fctrl = 0x8841,                // frame control (0x8841 to indicate a data frame using 16-bit addressing).
+        .PANID = 0xDECA,                 // PAN ID (0xDECA)
+        .code = DWT_TWR_INVALID,
+    }
+};
+#endif
 
 ip_addr_t ip6_tgt_addr[LWIP_IPV6_NUM_ADDRESSES];
 
@@ -80,10 +100,36 @@ static dw1000_lwip_p2p_node_address_t node_addr[] = {
     },
 };
 
+#if MYNEWT_VAL(DW1000_CCP_ENABLED)
+static void ccp_postprocess(struct os_event * ev){
+    assert(ev != NULL);
+    assert(ev->ev_arg != NULL);
+
+    dw1000_ccp_instance_t * ccp = (dw1000_ccp_instance_t *)ev->ev_arg;
+    dw1000_dev_instance_t* inst = ccp->parent;
+    ccp_frame_t * frame = ccp->frames[(ccp->idx-1)%ccp->nframes];
+
+    dw1000_lwip_p2p_instance_t * lwip_p2p = inst->lwip->lwip_p2p;
+    uint32_t idx = lwip_p2p->idx++ % (lwip_p2p->nnodes-1);
+    inst->lwip->dst_addr = lwip_p2p->payload_info[idx]->node_addr;
+
+    printf("\nPayload[%d] : %s\n", frame->seq_num, (char *)payload_info[0].output_payload.payload_ptr);
+
+    dw1000_set_delay_start(inst, 0x00);
+
+    dw1000_lwip_p2p_send(inst, idx);
+
+    dw1000_set_rx_timeout(inst, 0);
+    dw1000_start_rx(inst); 
+}
+#endif
+
 int main(int argc, char **argv){
     int rc;
     int nnodes = MYNEWT_VAL(MAX_NUM_NODES);
+#if !MYNEWT_VAL(DW1000_CCP_ENABLED)
     int payload_count = 0;
+#endif
 
     sysinit();
     hal_gpio_init_out(LED_BLINK_PIN, 1);
@@ -102,9 +148,13 @@ int main(int argc, char **argv){
     dw1000_set_address16(inst, inst->my_short_address);
 
     dw1000_mac_init(inst, NULL);
- 
-#if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)
+
+#if MYNEWT_VAL(DW1000_CCP_ENABLED)
+    dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
+    dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));  
+
     dw1000_ccp_init(inst, 2, MYNEWT_VAL(UUID_CCP_MASTER));
+    dw1000_ccp_set_postprocess(inst->ccp, &ccp_postprocess);
 #endif
 
 #if MYNEWT_VAL(DW1000_LWIP)
@@ -134,9 +184,7 @@ int main(int argc, char **argv){
 
 
     lwip_p2p_prep_tx_frame(inst, node_addr);
-    dw1000_lwip_p2p_init(inst, nnodes, node_addr, payload_info);
-
-    dw1000_lwip_p2p_start(inst);
+    dw1000_lwip_p2p_init(inst, nnodes, node_addr, payload_info);  
 #endif
 
     printf("device_id = 0x%lX\n",inst->device_id);
@@ -146,9 +194,18 @@ int main(int argc, char **argv){
     printf("lotID = 0x%lX\n",inst->lotID);
     printf("xtal_trim = 0x%X\n",inst->xtal_trim);
 
+#if MYNEWT_VAL(DW1000_CCP_ENABLED)
+    dw1000_set_rx_timeout(inst, 0);
+    dw1000_start_rx(inst); 
+#else
+    dw1000_lwip_p2p_start(inst);
+#endif
+
     while (1) {
         os_eventq_run(os_eventq_dflt_get());
+#if !MYNEWT_VAL(DW1000_CCP_ENABLED)
         printf("Payload[%d] : %s\n", ++payload_count, (char *)payload_info[0].output_payload.payload_ptr);
+#endif
     }
     assert(0);
     return rc;

@@ -46,6 +46,24 @@
 #define PING_ID 0xDDEE
 #define RX_STATUS true
 
+static dw1000_rng_config_t rng_config = {
+    .tx_holdoff_delay = 0x0C00,         // Send Time delay in usec.
+    .rx_timeout_period = 0x0800         // Receive response timeout in usec.
+};
+
+static twr_frame_t twr[] = {
+    [0] = {
+        .fctrl = 0x8841,                // frame control (0x8841 to indicate a data frame using 16-bit addressing).
+        .PANID = 0xDECA,                 // PAN ID (0xDECA)
+        .code = DWT_TWR_INVALID
+    },
+    [1] = {
+        .fctrl = 0x8841,                // frame control (0x8841 to indicate a data frame using 16-bit addressing).
+        .PANID = 0xDECA,                 // PAN ID (0xDECA)
+        .code = DWT_TWR_INVALID,
+    }
+};
+
 static
 dw1000_lwip_config_t lwip_config = {
 	.poll_resp_delay = 0x4800,
@@ -75,6 +93,7 @@ struct ping_payload *ping_pl;
 
 static u8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr);
 
+static uint8_t rx_flag = 0;
 int
 main(int argc, char **argv){
 
@@ -90,6 +109,8 @@ main(int argc, char **argv){
 
 	dw1000_set_panid(inst,inst->PANID);
 	dw1000_low_level_init(inst, NULL, NULL);
+    dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
+    dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));  
 	dw1000_lwip_init(inst, &lwip_config, MYNEWT_VAL(NUM_FRAMES), MYNEWT_VAL(BUFFER_SIZE));
     dw1000_netif_config(inst, &inst->lwip->lwip_netif, &my_ip_addr, RX_STATUS);
 	lwip_init();
@@ -114,13 +135,15 @@ main(int argc, char **argv){
 		}
 		if (inst->lwip->status.rx_timeout_error){
 			printf("timer_ev_cb:[rx_timeout_error]\n");
+			rx_flag = 0;
 		}
 
 		if (inst->lwip->status.rx_error || inst->lwip->status.request_timeout ||  inst->lwip->status.rx_timeout_error){
 			inst->lwip->status.start_tx_error = inst->lwip->status.rx_error = inst->lwip->status.request_timeout = inst->lwip->status.rx_timeout_error = 0;
 		}
 
-		cntxt->rx_cb.recv(inst, 0xffff);
+		if(!rx_flag)
+			cntxt->rx_cb.recv(inst, 0xffff);
 	}
 
 	assert(0);
@@ -138,6 +161,7 @@ ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
 	dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *)arg;
 	assert(inst->lwip->lwip_netif.state);
 
+	rx_flag = 0;
 	if (pbuf_header(p, -PBUF_IP_HLEN)==0) {
 		struct ping_payload *ping_pl = (struct ping_payload *)p->payload;
 
