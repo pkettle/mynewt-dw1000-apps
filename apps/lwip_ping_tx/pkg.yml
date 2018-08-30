@@ -17,7 +17,7 @@
 # under the License.
 #
 
-pkg.name: apps/ccp_lwip_ping_tx
+pkg.name: apps/lwip_ping_tx
 pkg.type: app
 pkg.description: "Basic lwip ping example"
 pkg.author: "Paul Kettle <paul.kettle@decawave.com>"
