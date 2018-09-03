@@ -55,26 +55,14 @@
  *
  * returns none
  */
-void
+bool
 pan_rx_complete_cb(dw1000_dev_instance_t * inst){
      if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_complete_cb != NULL)
-                inst->extension_cb->rx_complete_cb(inst);
-        //For the range service the fctrl is same as FCNTL_IEEE_RANGE_16
-        //In he range case the decision is always taken by application
-        //So put it back to receive only if the intended packet doesn't match
-        //any of the reserved or range packet
-        }else if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-            dw1000_dev_control_t control = inst->control_rx_context;
-            dw1000_restart_rx(inst, control);
-        }
-        return;
+        return false;
     }else if(inst->pan->status.valid == true){
         dw1000_dev_control_t control = inst->control_rx_context;
         dw1000_restart_rx(inst, control);
-        return;
+        return true;
     }
     dw1000_pan_instance_t * pan = inst->pan;
     pan_frame_t * frame = pan->frames[(pan->idx)%pan->nframes];
@@ -95,6 +83,7 @@ pan_rx_complete_cb(dw1000_dev_instance_t * inst){
     // both pan_master and TAG/ANCHOR
     if (pan->control.postprocess)
         os_eventq_put(os_eventq_dflt_get(), &pan->pan_callout_postprocess.c_ev);
+    return true;
 }
 
 /*! 
@@ -109,19 +98,15 @@ pan_rx_complete_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_tx_complete_cb(dw1000_dev_instance_t * inst){
    if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_complete_cb != NULL)
-                inst->extension_cb->tx_complete_cb(inst);
-        }
-    return;
+        return false;
    }
    dw1000_pan_instance_t * pan = inst->pan;
    os_sem_release(&inst->pan->sem);
    pan->idx++;
+    return true;
 }
 
 /*!
@@ -138,17 +123,13 @@ pan_tx_complete_cb(dw1000_dev_instance_t * inst){
  * returns none
  */
 
-void
+bool
 pan_tx_error_cb(dw1000_dev_instance_t * inst){
     /* Place holder */
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_error_cb != NULL)
-                inst->extension_cb->tx_error_cb(inst);
-        }
-        return;
+        return false;
     }
+    return true;
 }
 
 /*!
@@ -164,18 +145,14 @@ pan_tx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_rx_error_cb(dw1000_dev_instance_t * inst){
     /* Place holder */
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_error_cb != NULL)
-                inst->extension_cb->rx_error_cb(inst);
-        }
-        return;
+        return false;
     }
     os_sem_release(&inst->pan->sem);
+    return true;
 }
 
 /*! 
@@ -190,19 +167,15 @@ pan_rx_error_cb(dw1000_dev_instance_t * inst){
  *
  * returns none
  */
-void
+bool
 pan_rx_timeout_cb(dw1000_dev_instance_t * inst){
     //printf("pan_rx_timeout_cb\n");  
     if(inst->fctrl_array[0] != FCNTL_IEEE_BLINK_TAG_64){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_timeout_cb != NULL)
-                inst->extension_cb->rx_timeout_cb(inst);
-        }
-        return;
+        return false;
     }
     dw1000_pan_instance_t * pan = inst->pan;
     if (pan->control.postprocess){
         os_eventq_put(os_eventq_dflt_get(), &pan->pan_callout_postprocess.c_ev);
     }
+    return true;
 }

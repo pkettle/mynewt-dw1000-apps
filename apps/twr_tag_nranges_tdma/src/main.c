@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2017-2018, Decawave Limited, All Rights Reserved
- * 
+ *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -8,7 +8,7 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
@@ -95,8 +95,8 @@ static uint16_t g_slot[5] = {0,1,2,3,4};//{0,1,126,127};//,4,5,6,7,8,9,10,11,12,
        // 31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
 #endif
 
-static void timeout_cb(struct _dw1000_dev_instance_t * inst);
-static void error_cb(struct _dw1000_dev_instance_t * inst);
+static bool timeout_cb(struct _dw1000_dev_instance_t * inst);
+static bool error_cb(struct _dw1000_dev_instance_t * inst);
 
 /*! 
  * @fn frame_timer_cb(struct os_event * ev)
@@ -152,8 +152,7 @@ slot_timer_cb(struct os_event *ev){
     if (inst->status.rx_error)
         printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
     if (inst->status.rx_timeout_error)
-        //printf("{\"utime\": %lu,\"timer_ev_cb\":\"rx_timeout_error\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()));
-        printf("Rx-TimeOut Error:: missing %u responses\n",nnodes-nranges->resp_count);
+        printf("{\"utime\":%lu,\"Rx-TimeOut Error::missing %u responses\"}\n",os_cputime_ticks_to_usecs(os_cputime_get32()),nnodes-nranges->resp_count);
 
     if (inst->status.start_tx_error || inst->status.start_rx_error || inst->status.rx_error
             || inst->status.rx_timeout_error){
@@ -166,86 +165,16 @@ slot_timer_cb(struct os_event *ev){
         for(i = 0 ; i < nranges->resp_count ; i++)
         {
             float range = dw1000_rng_tof_to_meters(dw1000_nranges_twr_to_tof_frames(previous_frame+i, previous_frame+i+nnodes));
-            //printf("   src_address = 0x%X\n   dst_address = 0x%X\n",(previous_frame+i)->src_address,(previous_frame+i)->dst_address);
-            printf("   src= 0x%X\n   dst= 0x%X\n",(previous_frame+i)->src_address,(previous_frame+i)->dst_address);
-            printf("         range========= %lu\n",(uint32_t)(range*1000));
+            printf("  src_addr= 0x%X  dst_addr= 0x%X  range= %lu\n",(previous_frame+i)->src_address,(previous_frame+i)->dst_address, (uint32_t)(range*1000));
             (previous_frame+i+nnodes)->code = DWT_DS_TWR_NRNG_END;
             (previous_frame+i)->code = DWT_DS_TWR_NRNG_END;
         }
+        printf("time-secs:: %lu\n", os_cputime_ticks_to_usecs(os_cputime_get32())/1000000);
         rng->idx = 0xffff;
         nranges->resp_count = 0;
     }
 
 }
-
-#if 0
-/*! 
- * @fn frame_complete_cb(struct os_event * ev)
- *
- * @brief This function each 
- *
- * input parameters
- * @param inst - struct os_event *  
- *
- * output parameters
- *
- * returns none 
- */
-static void 
-slot_complete_cb(struct os_event * ev){
-    assert(ev != NULL);
-    assert(ev->ev_arg != NULL);
-
-    hal_gpio_toggle(LED_BLINK_PIN);
-    dw1000_dev_instance_t * inst = (dw1000_dev_instance_t *) ev->ev_arg;
-    dw1000_rng_instance_t * rng = inst->rng;
-    
-    twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
- 
-    if (frame->code == DWT_SS_TWR_FINAL) {
-        float time_of_flight = (float) dw1000_rng_twr_to_tof(rng);
-        float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
-        printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"res_req\": \"%lX\","
-                " \"rec_tra\": \"%lX\"}\n",
-                os_cputime_ticks_to_usecs(os_cputime_get32()),
-                *(uint32_t *)(&time_of_flight), 
-                *(uint32_t *)(&range),
-                (frame->response_timestamp - frame->request_timestamp),
-                (frame->transmission_timestamp - frame->reception_timestamp)
-        );
-        frame->code = DWT_SS_TWR_END;
-    }
-
-    else if (frame->code == DWT_DS_TWR_FINAL) {
-        float time_of_flight = dw1000_rng_twr_to_tof(rng);
-        float range = dw1000_rng_tof_to_meters(dw1000_rng_twr_to_tof(rng));
-        printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
-                " \"rec_tra\": \"%lX\"}\n",
-                os_cputime_ticks_to_usecs(os_cputime_get32()), 
-                *(uint32_t *)(&time_of_flight), 
-                *(uint32_t *)(&range),
-                *(uint32_t *)(&frame->spherical.azimuth),
-                (frame->response_timestamp - frame->request_timestamp),
-                (frame->transmission_timestamp - frame->reception_timestamp)
-        );
-        frame->code = DWT_DS_TWR_END;
-    } 
-
-    else if (frame->code == DWT_DS_TWR_EXT_FINAL) {
-        float time_of_flight = dw1000_rng_twr_to_tof(rng);
-        printf("{\"utime\": %lu,\"tof\": %lu,\"range\": %lu,\"azimuth\": %lu,\"res_req\":\"%lX\","
-                " \"rec_tra\": \"%lX\"}\n",
-                os_cputime_ticks_to_usecs(os_cputime_get32()), 
-                *(uint32_t *)(&time_of_flight), 
-                *(uint32_t *)(&frame->spherical.range),
-                *(uint32_t *)(&frame->spherical.azimuth),
-                (frame->response_timestamp - frame->request_timestamp),
-                (frame->transmission_timestamp - frame->reception_timestamp)
-        );
-        frame->code = DWT_DS_TWR_END;
-    } 
-}
-#endif
 
 /*! 
  * @fn timeout_cb(struct os_event *ev)
@@ -260,15 +189,10 @@ slot_complete_cb(struct os_event * ev){
  *
  * returns none 
  */
-static void 
+static bool
 timeout_cb(struct _dw1000_dev_instance_t * inst) {
     if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_timeout_cb != NULL)
-                inst->extension_cb->rx_timeout_cb(inst);
-        }
-        return;
+        return false;
     }
 
     if (inst->status.rx_timeout_error){
@@ -279,6 +203,7 @@ timeout_cb(struct _dw1000_dev_instance_t * inst) {
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
+    return true;
 }
 
 /*! 
@@ -294,20 +219,10 @@ timeout_cb(struct _dw1000_dev_instance_t * inst) {
  *
  * returns none 
  */
-static void 
+static bool
 error_cb(struct _dw1000_dev_instance_t * inst) {
     if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->status.rx_error == 1 || inst->status.start_rx_error == 1){
-                if(inst->extension_cb->rx_error_cb != NULL)
-                    inst->extension_cb->rx_error_cb(inst);
-            }else if(inst->status.start_tx_error == 1){
-                if(inst->extension_cb->tx_error_cb != NULL)
-                    inst->extension_cb->tx_error_cb(inst);
-            }
-        }
-        return;
+        return false;
     }   
     uint32_t utime = os_cputime_ticks_to_usecs(os_cputime_get32());
     if (inst->status.start_rx_error)
@@ -322,16 +237,15 @@ error_cb(struct _dw1000_dev_instance_t * inst) {
         dw1000_set_rx_timeout(inst, 0);
         dw1000_start_rx(inst); 
     }
+    return true;
 }
-static void
+
+static bool
 tx_complete_cb(dw1000_dev_instance_t* inst){
     if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->tx_complete_cb != NULL)
-                inst->extension_cb->tx_complete_cb(inst);
-        }
+        return false;
     }
+    return true;
 }
 
 
@@ -351,19 +265,10 @@ tx_complete_cb(dw1000_dev_instance_t* inst){
 /* The timer callout */
 //static struct os_callout slot_complete_callout;
 
-static void 
+static bool 
 complete_cb(struct _dw1000_dev_instance_t * inst){
     if(inst->fctrl != FCNTL_IEEE_RANGE_16){
-        if(inst->extension_cb->next != NULL){
-            inst->extension_cb = inst->extension_cb->next;
-            if(inst->extension_cb->rx_complete_cb != NULL)
-                inst->extension_cb->rx_complete_cb(inst);
-        }else{
-            dw1000_dev_control_t control = inst->control_rx_context;
-            inst->control = inst->control_rx_context;
-            dw1000_restart_rx(inst, control);
-        }
-        return;
+        return false;
     }
     //os_callout_init(&slot_complete_callout, os_eventq_dflt_get(), slot_complete_cb, inst);
     //os_eventq_put(os_eventq_dflt_get(), &slot_complete_callout.c_ev);
@@ -374,6 +279,7 @@ complete_cb(struct _dw1000_dev_instance_t * inst){
             dw1000_set_rx_timeout(inst, 0);
             dw1000_start_rx(inst); 
     }
+    return true;
 }
 
 static void
@@ -398,15 +304,15 @@ pan_postprocess(struct os_event* ev){
 int main(int argc, char **argv){
     int rc;
     dw1000_extension_callbacks_t tdma_cbs;
-      
+
     sysinit();
     hal_gpio_init_out(LED_BLINK_PIN, 1);
     hal_gpio_init_out(LED_1, 1);
     hal_gpio_init_out(LED_3, 1);
-    
+
     dw1000_dev_instance_t * inst = hal_dw1000_inst(0);
     dw1000_softreset(inst);
-    dw1000_phy_init(inst, NULL);   
+    dw1000_phy_init(inst, NULL);
 
     inst->PANID = 0xDECA;
     inst->my_short_address = MYNEWT_VAL(DEVICE_ID) + ALT_SLOT;
@@ -474,4 +380,3 @@ int main(int argc, char **argv){
     assert(0);
     return rc;
 }
-
