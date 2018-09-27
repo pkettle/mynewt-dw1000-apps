@@ -122,7 +122,7 @@ static void timer_ev_cb(struct os_event *ev) {
     nranges->t1_final_flag = 1;
 
     dw1000_nranges_request(inst, 0xffff, DWT_DS_TWR_NRNG);
-
+    dw1000_phy_forcetrxoff(inst);
     twr_frame_t * previous_frame = rng->frames[(rng->idx-1)%rng->nframes];
     twr_frame_t * frame = rng->frames[(rng->idx)%rng->nframes];
     printf("rng->idx == %d \n",(rng->idx-1)%rng->nframes);
@@ -198,6 +198,7 @@ int main(int argc, char **argv){
     dw1000_set_address16(inst,inst->my_short_address);
     dw1000_mac_init(inst, NULL);
     dw1000_mac_framefilter(inst,DWT_FF_DATA_EN);
+    dw1000_set_dblrxbuff(inst, true);
     dw1000_rng_init(inst, &rng_config, sizeof(twr)/sizeof(twr_frame_t));
     dw1000_rng_set_frames(inst, twr, sizeof(twr)/sizeof(twr_frame_t));
 #if MYNEWT_VAL(DW1000_CLOCK_CALIBRATION)
