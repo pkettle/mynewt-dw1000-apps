@@ -20,7 +20,7 @@
 -->
 
 # Decawave DW1000 Applications 
-[![Build Status](https://travis-ci.org/Decawave/mynewt-dw1000-apps.svg?branch=master)](https://travis-ci.org/Decawave/mynewt-dw1000-apps)
+[![Build Status](https://travis-ci.org/pkettle/mynewt-dw1000-apps.svg?branch=master)](https://travis-ci.org/pkettle/mynewt-dw1000-apps)
 
 ## Overview
 
